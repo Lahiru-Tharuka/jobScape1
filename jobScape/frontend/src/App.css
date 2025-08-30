@@ -2047,6 +2047,8 @@ p {
 .input-with-icon .input-icon {
   position: absolute;
   left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-muted);
   font-size: 1.1rem;
 }
