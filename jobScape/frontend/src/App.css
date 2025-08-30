@@ -1362,7 +1362,8 @@ p {
 
 /* Jobs Page Styles */
 .jobs-page {
-  padding: 2rem 0;
+  /* Add top padding to compensate for the fixed navbar so content isn't hidden */
+  padding: 6rem 0 2rem;
   min-height: 100vh;
   background: var(--bg-primary);
 }
