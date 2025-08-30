@@ -1,0 +1,22 @@
+{
+  "name": "jobscape-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest --runInBand --coverage"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.9",
+    "@babel/preset-env": "^7.23.9",
+    "@babel/preset-react": "^7.23.3",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "axios": "^1.7.2",
+    "babel-jest": "^29.7.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "mongodb-memory-server": "^8.12.1",
+    "supertest": "^6.3.3"
+  }
+}

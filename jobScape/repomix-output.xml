@@ -1,0 +1,5882 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+__tests__/backend/cron.test.js
+__tests__/backend/jobController.test.js
+__tests__/backend/middlewares.test.js
+__tests__/backend/models.test.js
+__tests__/backend/recommendationController.test.js
+__tests__/backend/recommendationRouter.test.js
+__tests__/backend/userController.test.js
+__tests__/backend/utils.test.js
+__tests__/frontend/Hero.test.jsx
+__tests__/frontend/userSlice.test.js
+.babelrc
+.env.example
+.github/workflows/ci-cd.yml
+.gitignore
+backend/app.js
+backend/automation/newsLetterCron.js
+backend/controllers/applicationController.js
+backend/controllers/jobController.js
+backend/controllers/recommendationController.js
+backend/controllers/userController.js
+backend/database/connection.js
+backend/middlewares/auth.js
+backend/middlewares/catchAsyncErrors.js
+backend/middlewares/error.js
+backend/models/applicationSchema.js
+backend/models/jobSchema.js
+backend/models/userSchema.js
+backend/package.json
+backend/routes/applicationRouter.js
+backend/routes/jobRouter.js
+backend/routes/recommendationRouter.js
+backend/routes/userRouter.js
+backend/server.js
+backend/utils/jwtToken.js
+backend/utils/sendEmail.js
+frontend/.eslintrc.cjs
+frontend/index.html
+frontend/package.json
+frontend/public/vite.svg
+frontend/README.md
+frontend/src/App.css
+frontend/src/App.jsx
+frontend/src/components/Applications.jsx
+frontend/src/components/Footer.jsx
+frontend/src/components/Hero.jsx
+frontend/src/components/HowItWorks.jsx
+frontend/src/components/JobPost.jsx
+frontend/src/components/MyApplications.jsx
+frontend/src/components/MyJobs.jsx
+frontend/src/components/MyProfile.jsx
+frontend/src/components/Navbar.jsx
+frontend/src/components/RecommendedJobs.jsx
+frontend/src/components/Spinner.jsx
+frontend/src/components/TopNiches.jsx
+frontend/src/components/ui/Button.jsx
+frontend/src/components/UpdatePassword.jsx
+frontend/src/components/UpdateProfile.jsx
+frontend/src/main.jsx
+frontend/src/pages/Dashboard.jsx
+frontend/src/pages/Home.jsx
+frontend/src/pages/Jobs.jsx
+frontend/src/pages/Login.jsx
+frontend/src/pages/NotFound.jsx
+frontend/src/pages/PostApplication.jsx
+frontend/src/pages/Register.jsx
+frontend/src/store/slices/applicationSlice.js
+frontend/src/store/slices/jobSlice.js
+frontend/src/store/slices/recommendationSlice.js
+frontend/src/store/slices/updateProfileSlice.js
+frontend/src/store/slices/userSlice.js
+frontend/src/store/store.js
+frontend/vite.config.js
+jest.config.js
+jest.setup.js
+ml_service/main.py
+ml_service/README.md
+ml_service/requirements.txt
+ml_service/sample_data/training.csv
+package.json
+scripts/deploy.sh
+scripts/generate-changelog.sh
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="__tests__/backend/cron.test.js">
+import { newsLetterCron } from '../../backend/automation/newsLetterCron.js';
+import cron from 'node-cron';
+import { Job } from '../../backend/models/jobSchema.js';
+import { User } from '../../backend/models/userSchema.js';
+import { sendEmail } from '../../backend/utils/sendEmail.js';
+
+jest.mock('node-cron', () => ({ schedule: jest.fn((expr, fn) => fn()) }));
+jest.mock('../../backend/models/jobSchema.js', () => ({ Job: { find: jest.fn() } }));
+jest.mock('../../backend/models/userSchema.js', () => ({ User: { find: jest.fn() } }));
+jest.mock('../../backend/utils/sendEmail.js', () => ({ sendEmail: jest.fn() }));
+
+describe('newsLetterCron', () => {
+  it('sends emails to matching users and marks job', async () => {
+    const job = { jobNiche:'Tech', title:'Dev', companyName:'X', location:'NY', salary:'100', newsLettersSent:false, save: jest.fn() };
+    Job.find.mockResolvedValue([job]);
+    User.find.mockResolvedValue([{ name:'User', email:'u@test.com' }]);
+    newsLetterCron();
+    await Promise.resolve();
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ email:'u@test.com' }));
+    expect(job.save).toHaveBeenCalled();
+  });
+});
+</file>
+
+<file path="__tests__/backend/jobController.test.js">
+import { postJob } from '../../backend/controllers/jobController.js';
+import ErrorHandler from '../../backend/middlewares/error.js';
+import { Job } from '../../backend/models/jobSchema.js';
+
+jest.mock('../../backend/models/jobSchema.js', () => ({ Job: { create: jest.fn(), find: jest.fn(), findById: jest.fn() } }));
+
+describe('postJob', () => {
+  it('errors if required fields missing', async () => {
+    const req = { body: {}, user: { _id: '1' } };
+    const next = jest.fn();
+    await postJob(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('errors if website fields mismatch', async () => {
+    const req = { body: { title:'t', jobType:'full', location:'loc', companyName:'comp', introduction:'intro', responsibilities:'res', qualifications:'qual', salary:'100', jobNiche:'tech', personalWebsiteTitle:'site' }, user:{ _id:'1' } };
+    const next = jest.fn();
+    await postJob(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('creates job successfully', async () => {
+    Job.create.mockResolvedValue({ title:'t' });
+    const req = { body: { title:'t', jobType:'full', location:'loc', companyName:'comp', introduction:'intro', responsibilities:'res', qualifications:'qual', salary:'100', jobNiche:'tech', personalWebsiteTitle:'site', personalWebsiteUrl:'url' }, user:{ _id:'1' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+    await postJob(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+});
+</file>
+
+<file path="__tests__/backend/middlewares.test.js">
+import { isAuthenticated, isAuthorized } from '../../backend/middlewares/auth.js';
+import { catchAsyncErrors } from '../../backend/middlewares/catchAsyncErrors.js';
+import { errorMiddleware } from '../../backend/middlewares/error.js';
+import ErrorHandler from '../../backend/middlewares/error.js';
+import jwt from 'jsonwebtoken';
+import { User } from '../../backend/models/userSchema.js';
+
+jest.mock('jsonwebtoken', () => ({ verify: jest.fn() }));
+jest.mock('../../backend/models/userSchema.js', () => ({ User: { findById: jest.fn() } }));
+
+describe('isAuthenticated', () => {
+  it('throws error if token missing', async () => {
+    const req = { cookies: {} };
+    const next = jest.fn();
+    await isAuthenticated(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('attaches user when token valid', async () => {
+    const req = { cookies: { token: 'abc' } };
+    const next = jest.fn();
+    jwt.verify.mockReturnValue({ id: '1' });
+    User.findById.mockResolvedValue({ name: 'Test' });
+    await isAuthenticated(req, {}, next);
+    expect(req.user).toEqual({ name: 'Test' });
+    expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('isAuthorized', () => {
+  it('blocks unauthorized role', () => {
+    const middleware = isAuthorized('Admin');
+    const req = { user: { role: 'User' } };
+    const next = jest.fn();
+    middleware(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('allows authorized role', () => {
+    const middleware = isAuthorized('Admin');
+    const req = { user: { role: 'Admin' } };
+    const next = jest.fn();
+    middleware(req, {}, next);
+    expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('catchAsyncErrors', () => {
+  it('catches errors and passes to next', async () => {
+    const fn = catchAsyncErrors(async () => { throw new Error('fail'); });
+    const next = jest.fn();
+    await fn({}, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+});
+
+describe('errorMiddleware', () => {
+  it('handles cast error', () => {
+    const err = { name: 'CastError', path: 'id' };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    errorMiddleware(err, {}, res, () => {});
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('handles default error', () => {
+    const err = { message: 'oops' };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    errorMiddleware(err, {}, res, () => {});
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+  });
+});
+</file>
+
+<file path="__tests__/backend/models.test.js">
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { User } from '../../backend/models/userSchema.js';
+
+describe('User model', () => {
+  let mongo;
+  beforeAll(async () => {
+    mongo = await MongoMemoryServer.create();
+    await mongoose.connect(mongo.getUri());
+  });
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongo.stop();
+  });
+
+  it('hashes password and compares', async () => {
+    const user = await User.create({
+      name:'Test',
+      email:'t@t.com',
+      phone:1,
+      address:'addr',
+      password:'password123',
+      role:'Employer'
+    });
+    expect(user.password).not.toBe('password123');
+    const match = await user.comparePassword('password123');
+    expect(match).toBe(true);
+  });
+
+  it('generates jwt token', () => {
+    const user = new User({
+      name:'Test', email:'t2@t.com', phone:1, address:'addr', password:'password123', role:'Employer'
+    });
+    const token = user.getJWTToken();
+    expect(typeof token).toBe('string');
+  });
+});
+</file>
+
+<file path="__tests__/backend/recommendationController.test.js">
+import { recommendJobs, suggestSkills } from '../../backend/controllers/recommendationController.js';
+import ErrorHandler from '../../backend/middlewares/error.js';
+import axios from 'axios';
+
+jest.mock('axios');
+
+describe('recommendationController', () => {
+  it('errors when resume missing', async () => {
+    const req = { body: {} };
+    const next = jest.fn();
+    await recommendJobs(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('returns recommendations', async () => {
+    axios.post.mockResolvedValue({ data: { recommendations: [] } });
+    const req = { body: { resume: 'test' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await recommendJobs(req, res, () => {});
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(axios.post).toHaveBeenCalled();
+  });
+
+  it('suggests skills', async () => {
+    axios.post.mockResolvedValue({ data: { missing_skills: ['python'] } });
+    const req = { body: { resume: 'hi', category: 'software' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await suggestSkills(req, res, () => {});
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+});
+</file>
+
+<file path="__tests__/backend/recommendationRouter.test.js">
+import express from 'express';
+import request from 'supertest';
+import recommendationRouter from '../../backend/routes/recommendationRouter.js';
+import axios from 'axios';
+import { errorMiddleware } from '../../backend/middlewares/error.js';
+
+jest.mock('axios');
+jest.mock('../../backend/middlewares/auth.js', () => ({
+  isAuthenticated: (req, res, next) => {
+    req.user = { _id: '1' };
+    next();
+  }
+}));
+
+const app = express();
+app.use(express.json());
+app.use('/api/v1', recommendationRouter);
+app.use(errorMiddleware);
+
+describe('recommendation routes', () => {
+  it('returns 200 for recommend', async () => {
+    axios.post.mockResolvedValue({ data: { recommendations: [] } });
+    const res = await request(app).post('/api/v1/recommend').send({ resume: 'abc' });
+    expect(res.status).toBe(200);
+  });
+
+  it('returns error for failing suggestSkills', async () => {
+    axios.post.mockRejectedValue(new Error('fail'));
+    const res = await request(app)
+      .post('/api/v1/suggestSkills')
+      .send({ resume: 'abc', category: 'software' });
+    expect(res.status).toBe(500);
+  });
+});
+</file>
+
+<file path="__tests__/backend/userController.test.js">
+import { register, login } from '../../backend/controllers/userController.js';
+import ErrorHandler from '../../backend/middlewares/error.js';
+import { User } from '../../backend/models/userSchema.js';
+import { sendToken } from '../../backend/utils/jwtToken.js';
+
+jest.mock('../../backend/models/userSchema.js', () => ({
+  User: {
+    findOne: jest.fn(),
+    create: jest.fn(),
+  },
+}));
+
+jest.mock('../../backend/utils/jwtToken.js', () => ({
+  sendToken: jest.fn(),
+}));
+
+jest.mock('cloudinary', () => ({
+  v2: { uploader: { upload: jest.fn() } }
+}));
+
+describe('userController register', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns error when required fields missing', async () => {
+    const req = { body: { email: 'test@test.com' } };
+    const next = jest.fn();
+    await register(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('returns error when email exists', async () => {
+    User.findOne.mockResolvedValue({ _id: '1' });
+    const req = { body: { name:'A', email:'test@test.com', phone:1, address:'addr', password:'password123', role:'Employer' } };
+    const next = jest.fn();
+    await register(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('registers successfully', async () => {
+    User.findOne.mockResolvedValue(null);
+    User.create.mockResolvedValue({ getJWTToken: () => 'token' });
+    const req = { body: { name:'A', email:'test@test.com', phone:1, address:'addr', password:'password123', role:'Employer' } };
+    const res = { status: jest.fn().mockReturnThis(), cookie: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+    await register(req, res, next);
+    expect(sendToken).toHaveBeenCalled();
+  });
+});
+
+describe('userController login', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('errors for missing fields', async () => {
+    const req = { body: { email: 'a@a.com' } };
+    const next = jest.fn();
+    await login(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('errors for invalid email', async () => {
+    User.findOne.mockResolvedValue(null);
+    const req = { body: { role:'Employer', email:'a@a.com', password:'pass1234' } };
+    const next = jest.fn();
+    await login(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('errors for wrong password', async () => {
+    User.findOne.mockResolvedValue({ comparePassword: jest.fn().mockResolvedValue(false), role:'Employer' });
+    const req = { body: { role:'Employer', email:'a@a.com', password:'pass1234' } };
+    const next = jest.fn();
+    await login(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('errors for role mismatch', async () => {
+    User.findOne.mockResolvedValue({ comparePassword: jest.fn().mockResolvedValue(true), role:'Job Seeker' });
+    const req = { body: { role:'Employer', email:'a@a.com', password:'pass1234' } };
+    const next = jest.fn();
+    await login(req, {}, next);
+    expect(next).toHaveBeenCalledWith(expect.any(ErrorHandler));
+  });
+
+  it('logs in successfully', async () => {
+    User.findOne.mockResolvedValue({ comparePassword: jest.fn().mockResolvedValue(true), role:'Employer' });
+    const req = { body: { role:'Employer', email:'a@a.com', password:'pass1234' } };
+    const res = { status: jest.fn().mockReturnThis(), cookie: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+    await login(req, res, next);
+    expect(sendToken).toHaveBeenCalled();
+  });
+});
+</file>
+
+<file path="__tests__/backend/utils.test.js">
+import { sendToken } from '../../backend/utils/jwtToken.js';
+import { sendEmail } from '../../backend/utils/sendEmail.js';
+import nodeMailer from 'nodemailer';
+
+jest.mock('nodemailer');
+
+describe('sendToken', () => {
+  it('sets cookie and returns token', () => {
+    const user = { getJWTToken: () => 'abc' };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      cookie: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    sendToken(user, 200, res, 'ok');
+    expect(res.cookie).toHaveBeenCalledWith('token', 'abc', expect.any(Object));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ token: 'abc', message: 'ok' }));
+  });
+});
+
+describe('sendEmail', () => {
+  it('uses nodemailer transport', async () => {
+    const send = jest.fn().mockResolvedValue(true);
+    nodeMailer.createTransport.mockReturnValue({ sendMail: send });
+    await sendEmail({ email: 'a@a.com', subject: 'sub', message: 'msg' });
+    expect(nodeMailer.createTransport).toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: 'a@a.com' }));
+  });
+});
+</file>
+
+<file path="__tests__/frontend/Hero.test.jsx">
+/** @jest-environment jsdom */
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import Hero from '../../frontend/src/components/Hero.jsx';
+
+describe('Hero component', () => {
+  it('renders heading', () => {
+    render(<Hero />);
+    expect(screen.getByText(/Find Your Dream Job Today/i)).toBeInTheDocument();
+  });
+});
+</file>
+
+<file path="__tests__/frontend/userSlice.test.js">
+import reducer, { register } from '../../frontend/src/store/slices/userSlice.js';
+import axios from 'axios';
+
+jest.mock('axios');
+
+describe('userSlice reducers', () => {
+  it('handles registerRequest', () => {
+    const state = reducer(undefined, { type: 'user/registerRequest' });
+    expect(state.loading).toBe(true);
+  });
+});
+
+describe('userSlice register thunk', () => {
+  it('dispatches success on resolve', async () => {
+    axios.post.mockResolvedValue({ data: { user: { name:'A' }, message:'done' } });
+    const dispatch = jest.fn();
+    await register({})(dispatch);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'user/registerSuccess' }));
+  });
+});
+</file>
+
+<file path=".babelrc">
+{
+  "presets": [
+    ["@babel/preset-env", {"targets": {"node": "current"}}],
+    "@babel/preset-react"
+  ]
+}
+</file>
+
+<file path=".github/workflows/ci-cd.yml">
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build backend
+        working-directory: backend
+        run: npm run build --if-present
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build --if-present
+      - name: Push build metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='build'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/build
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test --if-present
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test --if-present
+      - name: Push test metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='test'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/test
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging
+        run: ./scripts/deploy.sh staging
+      - name: Push staging metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='deploy_staging'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/deploy_staging
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production (blue-green)
+        run: ./scripts/deploy.sh production blue-green
+      - name: Push production metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='deploy_production'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/deploy_production
+  release:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create tag
+        run: |
+          VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Generate changelog
+        run: ./scripts/generate-changelog.sh "$VERSION"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          body_path: CHANGELOG.md
+</file>
+
+<file path=".gitignore">
+node_modules
+coverage
+</file>
+
+<file path="backend/automation/newsLetterCron.js">
+import cron from "node-cron";
+import { Job } from "../models/jobSchema.js";
+import { User } from "../models/userSchema.js";
+import { sendEmail } from "../utils/sendEmail.js";
+
+export const newsLetterCron = () => {
+  cron.schedule("*/1 * * * *", async () => {
+    console.log("Running Cron Automation");
+    const jobs = await Job.find({ newsLettersSent: false });
+    for (const job of jobs) {
+      try {
+        const filteredUsers = await User.find({
+          $or: [
+            { "niches.firstNiche": job.jobNiche },
+            { "niches.secondNiche": job.jobNiche },
+            { "niches.thirdNiche": job.jobNiche },
+          ],
+        });
+        for (const user of filteredUsers) {
+          const subject = `Hot Job Alert: ${job.title} in ${job.jobNiche} Available Now`;
+          const message = `Hi ${user.name},\n\nGreat news! A new job that fits your niche has just been posted. The position is for a ${job.title} with ${job.companyName}, and they are looking to hire immediately.\n\nJob Details:\n- **Position:** ${job.title}\n- **Company:** ${job.companyName}\n- **Location:** ${job.location}\n- **Salary:** ${job.salary}\n\nDon’t wait too long! Job openings like these are filled quickly. \n\nWe’re here to support you in your job search. Best of luck!\n\nBest Regards,\nNicheNest Team`;
+          sendEmail({
+            email: user.email,
+            subject,
+            message,
+          });
+        }
+        job.newsLettersSent = true;
+        await job.save();
+      } catch (error) {
+        console.log("ERROR IN NODE CRON CATCH BLOCK");
+        return next(console.error(error || "Some error in Cron."));
+      }
+    }
+  });
+};
+</file>
+
+<file path="backend/controllers/applicationController.js">
+import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
+import ErrorHandler from "../middlewares/error.js";
+import { Application } from "../models/applicationSchema.js";
+import { Job } from "../models/jobSchema.js";
+import { v2 as cloudinary } from "cloudinary";
+
+export const postApplication = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const { name, email, phone, address, coverLetter } = req.body;
+  if (!name || !email || !phone || !address || !coverLetter) {
+    return next(new ErrorHandler("All fields are required.", 400));
+  }
+  const jobSeekerInfo = {
+    id: req.user._id,
+    name,
+    email,
+    phone,
+    address,
+    coverLetter,
+    role: "Job Seeker",
+  };
+  const jobDetails = await Job.findById(id);
+  if (!jobDetails) {
+    return next(new ErrorHandler("Job not found.", 404));
+  }
+  const isAlreadyApplied = await Application.findOne({
+    "jobInfo.jobId": id,
+    "jobSeekerInfo.id": req.user._id,
+  });
+  if (isAlreadyApplied) {
+    return next(
+      new ErrorHandler("You have already applied for this job.", 400)
+    );
+  }
+  if (req.files && req.files.resume) {
+    const { resume } = req.files;
+    try {
+      const cloudinaryResponse = await cloudinary.uploader.upload(
+        resume.tempFilePath,
+        {
+          folder: "Job_Seekers_Resume",
+        }
+      );
+      if (!cloudinaryResponse || cloudinaryResponse.error) {
+        return next(
+          new ErrorHandler("Failed to upload resume to cloudinary.", 500)
+        );
+      }
+      jobSeekerInfo.resume = {
+        public_id: cloudinaryResponse.public_id,
+        url: cloudinaryResponse.secure_url,
+      };
+    } catch (error) {
+      return next(new ErrorHandler("Failed to upload resume", 500));
+    }
+  } else {
+    if (req.user && !req.user.resume.url) {
+      return next(new ErrorHandler("Please upload your resume.", 400));
+    }
+    jobSeekerInfo.resume = {
+      public_id: req.user && req.user.resume.public_id,
+      url: req.user && req.user.resume.url,
+    };
+  }
+  const employerInfo = {
+    id: jobDetails.postedBy,
+    role: "Employer",
+  };
+  const jobInfo = {
+    jobId: id,
+    jobTitle: jobDetails.title,
+  };
+  const application = await Application.create({
+    jobSeekerInfo,
+    employerInfo,
+    jobInfo,
+  });
+  res.status(201).json({
+    success: true,
+    message: "Application submitted.",
+    application,
+  });
+});
+
+export const employerGetAllApplication = catchAsyncErrors(
+  async (req, res, next) => {
+    const { _id } = req.user;
+    const applications = await Application.find({
+      "employerInfo.id": _id,
+      "deletedBy.employer": false,
+    });
+    res.status(200).json({
+      success: true,
+      applications,
+    });
+  }
+);
+
+export const jobSeekerGetAllApplication = catchAsyncErrors(
+  async (req, res, next) => {
+    const { _id } = req.user;
+    const applications = await Application.find({
+      "jobSeekerInfo.id": _id,
+      "deletedBy.jobSeeker": false,
+    });
+    res.status(200).json({
+      success: true,
+      applications,
+    });
+  }
+);
+
+export const deleteApplication = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const application = await Application.findById(id);
+  if (!application) {
+    return next(new ErrorHandler("Application not found.", 404));
+  }
+  const { role } = req.user;
+  switch (role) {
+    case "Job Seeker":
+      application.deletedBy.jobSeeker = true;
+      await application.save();
+      break;
+    case "Employer":
+      application.deletedBy.employer = true;
+      await application.save();
+      break;
+
+    default:
+      console.log("Default case for application delete function.");
+      break;
+  }
+
+  if (
+    application.deletedBy.employer === true &&
+    application.deletedBy.jobSeeker === true
+  ) {
+    await application.deleteOne();
+  }
+  res.status(200).json({
+    success: true,
+    message: "Application Deleted.",
+  });
+});
+</file>
+
+<file path="backend/controllers/recommendationController.js">
+import axios from "axios";
+import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
+import ErrorHandler from "../middlewares/error.js";
+
+const ML_URL = process.env.ML_SERVICE_URL || "http://localhost:8001";
+
+export const recommendJobs = catchAsyncErrors(async (req, res, next) => {
+  const { resume, topN } = req.body;
+  if (!resume) {
+    return next(new ErrorHandler("Resume text is required", 400));
+  }
+  const { data } = await axios.post(`${ML_URL}/recommend`, { resume, top_n: topN });
+  res.status(200).json({ success: true, recommendations: data.recommendations });
+});
+
+export const suggestSkills = catchAsyncErrors(async (req, res, next) => {
+  const { resume, category } = req.body;
+  if (!resume || !category) {
+    return next(new ErrorHandler("Resume text and category are required", 400));
+  }
+  const { data } = await axios.post(`${ML_URL}/suggestSkills`, { resume, category });
+  res
+    .status(200)
+    .json({ success: true, missingSkills: data.missing_skills });
+});
+</file>
+
+<file path="backend/controllers/userController.js">
+import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
+import ErrorHandler from "../middlewares/error.js";
+import { User } from "../models/userSchema.js";
+import { v2 as cloudinary } from "cloudinary";
+import { sendToken } from "../utils/jwtToken.js";
+
+export const register = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      address,
+      password,
+      role,
+      firstNiche,
+      secondNiche,
+      thirdNiche,
+      coverLetter,
+    } = req.body;
+
+    if (!name || !email || !phone || !address || !password || !role) {
+      return next(new ErrorHandler("All fileds are required.", 400));
+    }
+    if (role === "Job Seeker" && (!firstNiche || !secondNiche || !thirdNiche)) {
+      return next(
+        new ErrorHandler("Please provide your preferred job niches.", 400)
+      );
+    }
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return next(new ErrorHandler("Email is already registered.", 400));
+    }
+    const userData = {
+      name,
+      email,
+      phone,
+      address,
+      password,
+      role,
+      niches: {
+        firstNiche,
+        secondNiche,
+        thirdNiche,
+      },
+      coverLetter,
+    };
+    if (req.files && req.files.resume) {
+      const { resume } = req.files;
+      if (resume) {
+        try {
+          const cloudinaryResponse = await cloudinary.uploader.upload(
+            resume.tempFilePath,
+            { folder: "Job_Seekers_Resume",
+              access_mode: "public",
+             }
+          );
+          if (!cloudinaryResponse || cloudinaryResponse.error) {
+            return next(
+              new ErrorHandler("Failed to upload resume to cloud.", 500)
+            );
+          }
+          userData.resume = {
+            public_id: cloudinaryResponse.public_id,
+            url: cloudinaryResponse.secure_url,
+          };
+        } catch (error) {
+          return next(new ErrorHandler("Failed to upload resume", 500));
+        }
+      }
+    }
+    const user = await User.create(userData);
+    sendToken(user, 201, res, "User Registered.");
+  } catch (error) {
+    next(error);
+  }
+});
+
+export const login = catchAsyncErrors(async (req, res, next) => {
+  const { role, email, password } = req.body;
+  if (!role || !email || !password) {
+    return next(
+      new ErrorHandler("Email, password and role are required.", 400)
+    );
+  }
+  const user = await User.findOne({ email }).select("+password");
+  if (!user) {
+    return next(new ErrorHandler("Invalid email or password.", 400));
+  }
+  const isPasswordMatched = await user.comparePassword(password);
+  if (!isPasswordMatched) {
+    return next(new ErrorHandler("Invalid email or password.", 400));
+  }
+  if (user.role !== role) {
+    return next(new ErrorHandler("Invalid user role.", 400));
+  }
+  sendToken(user, 200, res, "User logged in successfully.");
+});
+
+export const logout = catchAsyncErrors(async (req, res, next) => {
+  res
+    .status(200)
+    .cookie("token", "", {
+      expires: new Date(Date.now()),
+      httpOnly: true,
+    })
+    .json({
+      success: true,
+      message: "Logged out successfully.",
+    });
+});
+
+export const getUser = catchAsyncErrors(async (req, res, next) => {
+  const user = req.user;
+  res.status(200).json({
+    success: true,
+    user,
+  });
+});
+
+export const updateProfile = catchAsyncErrors(async (req, res, next) => {
+  const newUserData = {
+    name: req.body.name,
+    email: req.body.email,
+    phone: req.body.phone,
+    address: req.body.address,
+    coverLetter: req.body.coverLetter,
+    niches: {
+      firstNiche: req.body.firstNiche,
+      secondNiche: req.body.secondNiche,
+      thirdNiche: req.body.thirdNiche,
+    },
+  };
+  const { firstNiche, secondNiche, thirdNiche } = newUserData.niches;
+
+  if (
+    req.user.role === "Job Seeker" &&
+    (!firstNiche || !secondNiche || !thirdNiche)
+  ) {
+    return next(
+      new ErrorHandler("Please provide your all preferred job niches.", 400)
+    );
+  }
+  if (req.files) {
+    const resume = req.files.resume;
+    if (resume) {
+      const currentResumeId = req.user.resume.public_id;
+      if (currentResumeId) {
+        await cloudinary.uploader.destroy(currentResumeId);
+      }
+      const newResume = await cloudinary.uploader.upload(resume.tempFilePath, {
+        folder: "Job_Seekers_Resume",
+      });
+      newUserData.resume = {
+        public_id: newResume.public_id,
+        url: newResume.secure_url,
+      };
+    }
+  }
+
+  const user = await User.findByIdAndUpdate(req.user.id, newUserData, {
+    new: true,
+    runValidators: true,
+    useFindAndModify: false,
+  });
+  res.status(200).json({
+    success: true,
+    user,
+    message: "Profile updated.",
+  });
+});
+
+export const updatePassword = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select("+password");
+
+  const isPasswordMatched = await user.comparePassword(req.body.oldPassword);
+
+  if (!isPasswordMatched) {
+    return next(new ErrorHandler("Old password is incorrect.", 400));
+  }
+
+  if (req.body.newPassword !== req.body.confirmPassword) {
+    return next(
+      new ErrorHandler("New password & confirm password do not match.", 400)
+    );
+  }
+
+  user.password = req.body.newPassword;
+  await user.save();
+  sendToken(user, 200, res, "Password updated successfully.");
+});
+</file>
+
+<file path="backend/database/connection.js">
+import mongoose from "mongoose";
+
+export const connection = ()=>{
+    mongoose.connect(process.env.MONGO_URI, {
+        dbName: "JOB_PORTAL_WITH_AUTOMATION"
+    }).then(()=>{
+        console.log("Connected to database.")
+    }).catch(err=>{
+        console.log(`Some error occured while connecting to database: ${err}`)
+    })
+}
+</file>
+
+<file path="backend/middlewares/auth.js">
+import { catchAsyncErrors } from "./catchAsyncErrors.js";
+import ErrorHandler from "./error.js";
+import jwt from "jsonwebtoken";
+import { User } from "../models/userSchema.js";
+
+export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
+  const { token } = req.cookies;
+  if (!token) {
+    return next(new ErrorHandler("User is not authenticated.", 400));
+  }
+  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+  req.user = await User.findById(decoded.id);
+
+  next();
+});
+
+export const isAuthorized = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return next(
+        new ErrorHandler(
+          `${req.user.role} not allowed to access this resource.`
+        )
+      );
+    }
+    next();
+  };
+};
+</file>
+
+<file path="backend/middlewares/catchAsyncErrors.js">
+export const catchAsyncErrors = (theFunction) => {
+  return (req, res, next) => {
+    Promise.resolve(theFunction(req, res, next)).catch(next);
+  };
+};
+</file>
+
+<file path="backend/middlewares/error.js">
+class ErrorHandler extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+export const errorMiddleware = (err, req, res, next) => {
+  err.statusCode = err.statusCode || 500;
+  err.message = err.message || "Internal server error.";
+
+  if (err.name === "CastError") {
+    const message = `Invalid ${err.path}`;
+    err = new ErrorHandler(message, 400);
+  }
+  if (err.code === 11000) {
+    const message = `Duplicate ${Object.keys(err.keyValue)} Entered.`;
+    err = new ErrorHandler(message, 400);
+  }
+  if (err.name === "JsonWebTokenError") {
+    const message = `Json Web Token is invalid, Try again.`;
+    err = new ErrorHandler(message, 400);
+  }
+  if (err.name === "TokenExpiredError") {
+    const message = `Json Web Token is expired, Try again.`;
+    err = new ErrorHandler(message, 400);
+  }
+
+  return res.status(err.statusCode).json({
+    success: false,
+    message: err.message,
+  });
+};
+
+
+export default ErrorHandler
+</file>
+
+<file path="backend/models/applicationSchema.js">
+import mongoose from "mongoose";
+import validator from "validator";
+const applicationSchema = new mongoose.Schema({
+  jobSeekerInfo: {
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      validate: [validator.isEmail, "Please provide a valid email."],
+    },
+    phone: {
+      type: Number,
+      required: true,
+    },
+    address: {
+      type: String,
+      required: true,
+    },
+    resume: {
+      public_id: String,
+      url: String,
+    },
+    coverLetter: {
+      type: String,
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ["Job Seeker"],
+      required: true,
+    },
+  },
+  employerInfo: {
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ["Employer"],
+      required: true,
+    },
+  },
+  jobInfo: {
+    jobId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    jobTitle: {
+      type: String,
+      required: true,
+    },
+  },
+  deletedBy: {
+    jobSeeker: {
+      type: Boolean,
+      default: false,
+    },
+    employer: {
+      type: Boolean,
+      default: false,
+    },
+  },
+});
+
+export const Application = mongoose.model("Application", applicationSchema);
+</file>
+
+<file path="backend/models/jobSchema.js">
+import mongoose from "mongoose";
+
+const jobSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+  },
+  jobType: {
+    type: String,
+    required: true,
+    enum: ["Full-time", "Part-time"],
+  },
+  location: {
+    type: String,
+    required: true,
+  },
+  companyName: {
+    type: String,
+    required: true,
+  },
+  introduction: {
+    type: String,
+  },
+  responsibilities: {
+    type: String,
+    required: true,
+  },
+  qualifications: {
+    type: String,
+    required: true,
+  },
+  offers: {
+    type: String,
+  },
+  salary: {
+    type: String,
+    required: true,
+  },
+  hiringMultipleCandidates: {
+    type: String,
+    default: "No",
+    enum: ["Yes", "No"],
+  },
+  personalWebsite: {
+    title: String,
+    url: String
+  },
+  jobNiche: {
+    type: String,
+    required: true,
+  },
+  newsLettersSent: {
+    type: Boolean,
+    default: false,
+  },
+  jobPostedOn: {
+    type: Date,
+    default: Date.now,
+  },
+  postedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+});
+
+export const Job = mongoose.model("Job", jobSchema);
+</file>
+
+<file path="backend/models/userSchema.js">
+import mongoose from "mongoose";
+import bcrypt from 'bcryptjs';
+import jwt from "jsonwebtoken";
+import validator from "validator";
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    minLength: [3, "Name must cotain at least 3 characters."],
+    maxLength: [30, "Name cannot exceed 30 characters."],
+  },
+  email: {
+    type: String,
+    required: true,
+    validate: [validator.isEmail, "Please provide valid email."],
+  },
+  phone: {
+    type: Number,
+    required: true,
+  },
+  address: {
+    type: String,
+    required: true,
+  },
+  niches: {
+    firstNiche: String,
+    secondNiche: String,
+    thirdNiche: String,
+  },
+  password: {
+    type: String,
+    required: true,
+    minLength: [8, "Password must cantain at least 8 chatacters."],
+    maxLength: [32, "Password cannot exceed 32 characters."],
+    select: false
+  },
+  resume: {
+    public_id: String,
+    url: String,
+  },
+  coverLetter: {
+    type: String,
+  },
+  role: {
+    type: String,
+    required: true,
+    enum: ["Job Seeker", "Employer"],
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    next();
+  }
+  this.password = await bcrypt.hash(this.password, 10);
+});
+
+userSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+userSchema.methods.getJWTToken = function () {
+  return jwt.sign({ id: this._id }, process.env.JWT_SECRET_KEY, {
+    expiresIn: process.env.JWT_EXPIRE,
+  });
+};
+
+export const User = mongoose.model("User", userSchema);
+</file>
+
+<file path="backend/routes/applicationRouter.js">
+import express from "express";
+import { isAuthenticated, isAuthorized } from "../middlewares/auth.js";
+import {
+  deleteApplication,
+  employerGetAllApplication,
+  jobSeekerGetAllApplication,
+  postApplication,
+} from "../controllers/applicationController.js";
+
+const router = express.Router();
+
+router.post(
+  "/post/:id",
+  isAuthenticated,
+  isAuthorized("Job Seeker"),
+  postApplication
+);
+
+router.get(
+  "/employer/getall",
+  isAuthenticated,
+  isAuthorized("Employer"),
+  employerGetAllApplication
+);
+
+router.get(
+  "/jobseeker/getall",
+  isAuthenticated,
+  isAuthorized("Job Seeker"),
+  jobSeekerGetAllApplication
+);
+
+router.delete("/delete/:id", isAuthenticated, deleteApplication);
+
+export default router;
+</file>
+
+<file path="backend/routes/recommendationRouter.js">
+import express from "express";
+import { isAuthenticated } from "../middlewares/auth.js";
+import { recommendJobs, suggestSkills } from "../controllers/recommendationController.js";
+
+const router = express.Router();
+
+router.post("/recommend", isAuthenticated, recommendJobs);
+router.post("/suggestSkills", isAuthenticated, suggestSkills);
+
+export default router;
+</file>
+
+<file path="backend/routes/userRouter.js">
+import express from "express";
+import { getUser, login, logout, register, updatePassword, updateProfile } from "../controllers/userController.js";
+import { isAuthenticated } from "../middlewares/auth.js";
+
+const router = express.Router();
+
+router.post("/register", register);
+router.post("/login", login);
+router.get("/logout", isAuthenticated, logout);
+router.get("/getuser", isAuthenticated, getUser);
+router.put("/update/profile", isAuthenticated, updateProfile)
+router.put("/update/password", isAuthenticated, updatePassword)
+
+export default router;
+</file>
+
+<file path="backend/server.js">
+import app from "./app.js";
+import cloudinary from "cloudinary";
+
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+app.listen(process.env.PORT, () => {
+  console.log(`Server listening at port ${process.env.PORT}`);
+});
+</file>
+
+<file path="backend/utils/jwtToken.js">
+export const sendToken = (user, statusCode, res, message) => {
+  const token = user.getJWTToken();
+  const options = {
+    expires: new Date(
+      Date.now() + process.env.COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true,
+  };
+
+  res.status(statusCode).cookie("token", token, options).json({
+    success: true,
+    user,
+    message,
+    token,
+  });
+};
+</file>
+
+<file path="backend/utils/sendEmail.js">
+import nodeMailer from "nodemailer";
+
+export const sendEmail = async ({ email, subject, message }) => {
+  const transporter = nodeMailer.createTransport({
+    host: process.env.SMTP_HOST,
+    service: process.env.SMTP_SERVICE,
+    port: process.env.SMTP_PORT,
+    auth: {
+      user: process.env.SMTP_MAIL,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  const options = {
+    from: process.env.SMTP_MAIL,
+    to: email,
+    subject: subject,
+    text: message,
+  };
+
+  await transporter.sendMail(options);
+};
+</file>
+
+<file path="frontend/.eslintrc.cjs">
+module.exports = {
+  root: true,
+  env: { browser: true, es2020: true },
+  extends: [
+    'eslint:recommended',
+    'plugin:react/recommended',
+    'plugin:react/jsx-runtime',
+    'plugin:react-hooks/recommended',
+  ],
+  ignorePatterns: ['dist', '.eslintrc.cjs'],
+  parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+  settings: { react: { version: '18.2' } },
+  plugins: ['react-refresh'],
+  rules: {
+    'react/jsx-no-target-blank': 'off',
+    'react-refresh/only-export-components': [
+      'warn',
+      { allowConstantExport: true },
+    ],
+  },
+}
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobScape</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.6",
+    "axios": "^1.7.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.2.1",
+    "react-redux": "^9.1.2",
+    "react-router-dom": "^6.25.1",
+    "react-spinners": "^0.14.1",
+    "react-toastify": "^10.0.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "vite": "^5.3.4"
+  }
+}
+</file>
+
+<file path="frontend/public/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+</file>
+
+<file path="frontend/README.md">
+# React + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+</file>
+
+<file path="frontend/src/App.jsx">
+import React, { useEffect } from "react";
+import "./App.css";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Jobs from "./pages/Jobs";
+import Login from "./pages/Login";
+import NotFound from "./pages/NotFound";
+import PostApplication from "./pages/PostApplication";
+import Register from "./pages/Register";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useDispatch } from "react-redux";
+import { getUser } from "./store/slices/userSlice";
+
+const App = () => {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(getUser());
+  }, []);
+
+  return (
+    <>
+      <Router>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/post/application/:jobId"
+            element={<PostApplication />}
+          />
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <Footer />
+        <ToastContainer position="top-right" theme="dark" />
+      </Router>
+    </>
+  );
+};
+
+export default App;
+</file>
+
+<file path="frontend/src/components/Applications.jsx">
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import {
+  clearAllApplicationErrors,
+  deleteApplication,
+  fetchEmployerApplications,
+  resetApplicationSlice,
+} from "../store/slices/applicationSlice";
+import Spinner from "./Spinner";
+import { Link } from "react-router-dom";
+
+const Applications = () => {
+  const { applications, loading, error, message } = useSelector(
+    (state) => state.applications
+  );
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllApplicationErrors());
+    }
+    if (message) {
+      toast.success(message);
+      dispatch(resetApplicationSlice());
+    }
+    dispatch(fetchEmployerApplications());
+  }, [dispatch, error, message]);
+
+  const handleDeleteApplication = (id) => {
+    dispatch(deleteApplication(id));
+  };
+
+  return (
+    <>
+      {loading ? (
+        <Spinner />
+      ) : applications && applications.length <= 0 ? (
+        <h1>You have no applications from job seekers.</h1>
+      ) : (
+        <>
+          <div className="account_components">
+            <h3>Applications For Your Posted Jobs</h3>
+            <div className="applications_container">
+              {applications.map((element) => {
+                return (
+                  <div className="card" key={element._id}>
+                    <p className="sub-sec">
+                      <span>Job Title: </span> {element.jobInfo.jobTitle}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Applicant's Name: </span>{" "}
+                      {element.jobSeekerInfo.name}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Applicant's Email:</span>{" "}
+                      {element.jobSeekerInfo.email}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Applicant's Phone: </span>{" "}
+                      {element.jobSeekerInfo.phone}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Applicant's Address: </span>{" "}
+                      {element.jobSeekerInfo.address}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Applicant's CoverLetter: </span>
+                      <textarea
+                        value={element.jobSeekerInfo.coverLetter}
+                        rows={5}
+                        disabled
+                      ></textarea>
+                    </p>
+                    <div className="btn-wrapper">
+                      <button
+                        className="outline_btn"
+                        onClick={() => handleDeleteApplication(element._id)}
+                      >
+                        Delete Application
+                      </button>
+                      <Link
+                        to={
+                          element.jobSeekerInfo &&
+                          element.jobSeekerInfo.resume.url
+                        }
+                        className="btn"
+                        target="_blank"
+                      >
+                        View Resume
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+export default Applications;
+</file>
+
+<file path="frontend/src/components/HowItWorks.jsx">
+import React from "react";
+import { LuUserPlus } from "react-icons/lu";
+import { VscTasklist } from "react-icons/vsc";
+import { BiSolidLike } from "react-icons/bi";
+
+const HowItWorks = () => {
+  return (
+    <section className="howItWorks">
+      <h3>How does it work?</h3>
+      <div className="container">
+        <div className="card">
+          <div className="icon">
+            <LuUserPlus />
+          </div>
+          <h4>Create an Account</h4>
+          <p>
+            Sign up for a free account as a job seeker or employer. Set up your
+            profile in minutes to start posting jobs or applying for jobs.
+            Customize your profile to highlight your skills or requirements.
+          </p>
+        </div>
+        <div className="card">
+          <div className="icon">
+            <VscTasklist />
+          </div>
+          <h4>Post or Browse Jobs</h4>
+          <p>
+            Employers can post detailed job descriptions, and job seekers can
+            browse a comprehensive list of available positions. Utilize filters
+            to find jobs that match your skills and preferences.
+          </p>
+        </div>
+        <div className="card">
+          <div className="icon">
+            <BiSolidLike />
+          </div>
+          <h4>Hire or Get Hired</h4>
+          <p>
+            Employers can shortlist candidates and extend job offers. Job
+            seekers can review job offers and accept positions that align with
+            their career goals.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default HowItWorks;
+</file>
+
+<file path="frontend/src/components/MyJobs.jsx">
+import React, { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { toast } from "react-toastify";
+import {
+  clearAllJobErrors,
+  deleteJob,
+  getMyJobs,
+  resetJobSlice,
+} from "../store/slices/jobSlice";
+import Spinner from "../components/Spinner";
+
+const MyJobs = () => {
+  const { loading, error, myJobs, message } = useSelector(
+    (state) => state.jobs
+  );
+  const dispatch = useDispatch();
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllJobErrors());
+    }
+    if (message) {
+      toast.success(message);
+      dispatch(resetJobSlice());
+    }
+    dispatch(getMyJobs());
+  }, [dispatch, error, message]);
+
+  const handleDeleteJob = (id) => {
+    dispatch(deleteJob(id));
+  };
+
+  return (
+    <>
+      {loading ? (
+        <Spinner />
+      ) : myJobs && myJobs.length <= 0 ? (
+        <h1 style={{ fontSize: "1.4rem", fontWeight: "600" }}>
+          You have not posted any job!
+        </h1>
+      ) : (
+        <>
+          <div className="account_components">
+            <h3>My Jobs</h3>
+            <div className="applications_container">
+              {myJobs.map((element) => (
+                <div className="card" key={element._id}>
+                  <p className="sub-sec">
+                    <span>Job Title: </span>
+                    {element.title}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Job Niche:</span> {element.jobNiche}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Salary: </span> {element.salary}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Location:</span> {element.location}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Job Type:</span> {element.jobType}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Company Name:</span> {element.companyName}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Introduction:</span> {element.introduction}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Qualifications:</span> {element.qualifications}
+                  </p>
+                  <p className="sub-sec">
+                    <span>Responsibilities:</span> {element.responsibilities}
+                  </p>
+                  {element.offers && (
+                    <p className="sub-sec">
+                      <span>What Are We Offering:</span> {element.offers}
+                    </p>
+                  )}
+                  <button
+                    className="btn"
+                    onClick={() => handleDeleteJob(element._id)}
+                  >
+                    Delete Job
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+export default MyJobs;
+</file>
+
+<file path="frontend/src/components/MyProfile.jsx">
+import React from "react";
+import { useSelector } from "react-redux";
+
+const MyProfile = () => {
+  const { user } = useSelector((state) => state.user);
+  return (
+    <div className="account_components">
+      <h3>My Profile</h3>
+      <div>
+        <label>Full Name</label>
+        <input
+          type="text"
+          disabled
+          value={user && user.name}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+      <div>
+        <label>Email Address</label>
+        <input
+          type="email"
+          disabled
+          value={user && user.email}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+      {user && user.role === "Job Seeker" && (
+        <div>
+          <label>My Preferred Job Niches</label>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+          >
+            <input
+              type="text"
+              disabled
+              value={user && user.niches.firstNiche}
+              onChange={(e) => e.target.value}
+            />
+            <input
+              type="text"
+              disabled
+              value={user && user.niches.secondNiche}
+              onChange={(e) => e.target.value}
+            />
+            <input
+              type="text"
+              disabled
+              value={user && user.niches.thirdNiche}
+              onChange={(e) => e.target.value}
+            />
+          </div>
+        </div>
+      )}
+      <div>
+        <label>Phone Number</label>
+        <input
+          type="number"
+          disabled
+          value={user && user.phone}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+      <div>
+        <label>Address</label>
+        <input
+          type="text"
+          disabled
+          value={user && user.address}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+      <div>
+        <label>Role</label>
+        <input
+          type="text"
+          disabled
+          value={user && user.role}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+      <div>
+        <label>Joined On</label>
+        <input
+          type="text"
+          disabled
+          value={user && user.createdAt}
+          onChange={(e) => e.target.value}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default MyProfile;
+</file>
+
+<file path="frontend/src/components/RecommendedJobs.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchRecommendations, fetchSkillSuggestions, clearRecommendationErrors } from "../store/slices/recommendationSlice";
+import { toast } from "react-toastify";
+
+const RecommendedJobs = () => {
+  const [resume, setResume] = useState("");
+  const [category, setCategory] = useState("");
+  const dispatch = useDispatch();
+  const { recommendations, skills, loading, error } = useSelector(
+    (state) => state.recommendation
+  );
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearRecommendationErrors());
+    }
+  }, [error, dispatch]);
+
+  const handleRecommend = () => {
+    if (resume.trim()) {
+      dispatch(fetchRecommendations(resume));
+    }
+  };
+
+  const handleSkills = () => {
+    if (resume.trim() && category.trim()) {
+      dispatch(fetchSkillSuggestions(resume, category));
+    }
+  };
+
+  return (
+    <div className="recommended">
+      <h3>Get Job Recommendations</h3>
+      <textarea
+        value={resume}
+        onChange={(e) => setResume(e.target.value)}
+        placeholder="Paste your resume text here"
+        rows="6"
+      />
+      <button onClick={handleRecommend} disabled={loading}>
+        {loading ? "Loading..." : "Recommend"}
+      </button>
+      {recommendations && recommendations.length > 0 && (
+        <ul>
+          {recommendations.map((r, i) => (
+            <li key={i}>{`${r.title} - ${(r.score * 100).toFixed(1)}%`}</li>
+          ))}
+        </ul>
+      )}
+      <h4>Improve My Résumé</h4>
+      <input
+        type="text"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        placeholder="Desired job category"
+      />
+      <button onClick={handleSkills} disabled={loading}>
+        {loading ? "Checking..." : "Suggest Skills"}
+      </button>
+      {skills && skills.length > 0 && (
+        <ul>
+          {skills.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+export default RecommendedJobs;
+</file>
+
+<file path="frontend/src/components/Spinner.jsx">
+import React from "react";
+import { ClipLoader } from "react-spinners";
+
+const Spinner = () => {
+  return (
+    <>
+      <section
+        style={{
+          minHeight: "525px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ClipLoader size={150} />
+      </section>
+    </>
+  );
+};
+
+export default Spinner;
+</file>
+
+<file path="frontend/src/components/ui/Button.jsx">
+import React from "react";
+import { Link } from "react-router-dom";
+
+const Button = ({ children, to, href, variant = "primary", className = "", ...rest }) => {
+  const classes = ["btn"];
+  if (variant === "outline") classes.push("outline_btn");
+  if (variant === "black") classes.push("black_btn");
+  if (className) classes.push(className);
+
+  if (to) {
+    return (
+      <Link to={to} className={classes.join(" ")} {...rest}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (href) {
+    return (
+      <a href={href} className={classes.join(" ")} {...rest}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button className={classes.join(" ")} {...rest}>
+      {children}
+    </button>
+  );
+};
+
+export default Button;
+</file>
+
+<file path="frontend/src/components/UpdatePassword.jsx">
+import React, { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import {
+  clearAllUpdateProfileErrors,
+  updatePassword,
+} from "../store/slices/updateProfileSlice";
+import { getUser } from "../store/slices/userSlice";
+import { FaRegEyeSlash, FaEye } from "react-icons/fa";
+import { toast } from "react-toastify";
+
+const UpdatePassword = () => {
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const { loading, error, isUpdated } = useSelector(
+    (state) => state.updateProfile
+  );
+
+  const dispatch = useDispatch();
+
+  const handleUpdatePassword = () => {
+    const formData = new FormData();
+    formData.append("oldPassword", oldPassword);
+    formData.append("newPassword", newPassword);
+    formData.append("confirmPassword", confirmPassword);
+    dispatch(updatePassword(formData));
+  };
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllUpdateProfileErrors());
+    }
+    if (isUpdated) {
+      toast.success("Password Updated");
+      dispatch(getUser());
+      dispatch(clearAllUpdateProfileErrors());
+    }
+  }, [dispatch, loading, error, isUpdated]);
+
+  return (
+    <div className="account_components update_password_component">
+      <h3>Update Password</h3>
+      <div>
+        <label>Current Password</label>
+        <input
+          type={showPassword ? "text" : "password"}
+          value={oldPassword}
+          onChange={(e) => setOldPassword(e.target.value)}
+        />
+        {showPassword ? (
+          <FaRegEyeSlash
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        ) : (
+          <FaEye
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        )}
+      </div>
+      <div>
+        <label>New Password</label>
+        <input
+          type={showPassword ? "text" : "password"}
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+        {showPassword ? (
+          <FaRegEyeSlash
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        ) : (
+          <FaEye
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        )}
+      </div>
+      <div>
+        <label>Confirm Password</label>
+        <input
+          type={showPassword ? "text" : "password"}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        {showPassword ? (
+          <FaRegEyeSlash
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        ) : (
+          <FaEye
+            className="eye_icon"
+            onClick={() => setShowPassword(!showPassword)}
+          />
+        )}
+      </div>
+      <div className="save_change_btn_wrapper">
+        <button
+          className="btn"
+          onClick={handleUpdatePassword}
+          disabled={loading}
+        >
+          Update Password
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default UpdatePassword;
+</file>
+
+<file path="frontend/src/components/UpdateProfile.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  clearAllUpdateProfileErrors,
+  updateProfile,
+} from "../store/slices/updateProfileSlice";
+import { toast } from "react-toastify";
+import { getUser } from "../store/slices/userSlice";
+
+const UpdateProfile = () => {
+  const { user } = useSelector((state) => state.user);
+  const { loading, error, isUpdated } = useSelector(
+    (state) => state.updateProfile
+  );
+
+  const dispatch = useDispatch();
+  const navigateTo = useNavigate();
+
+  const [name, setName] = useState(user && user.name);
+  const [email, setEmail] = useState(user && user.email);
+  const [phone, setPhone] = useState(user && user.phone);
+  const [address, setAddress] = useState(user && user.address);
+  const [coverLetter, setCoverLetter] = useState(user && user.coverLetter);
+  const [firstNiche, setFirstNiche] = useState(user && user.niches?.firstNiche);
+  const [secondNiche, setSecondNiche] = useState(
+    user && user.niches?.secondNiche
+  );
+  const [thirdNiche, setThirdNiche] = useState(user && user.niches?.thirdNiche);
+  const [resume, setResume] = useState(null);
+  const [resumePreview, setResumePreview] = useState(user && user.resume?.url);
+
+  const handleUpdateProfile = () => {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("email", email);
+    formData.append("phone", phone);
+    formData.append("address", address);
+    if (user && user.role === "Job Seeker") {
+      formData.append("firstNiche", firstNiche);
+      formData.append("secondNiche", secondNiche);
+      formData.append("thirdNiche", thirdNiche);
+      formData.append("coverLetter", coverLetter);
+    }
+    if (resume) {
+      formData.append("resume", resume);
+    }
+    dispatch(updateProfile(formData));
+  };
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllUpdateProfileErrors());
+    }
+    if (isUpdated) {
+      toast.success("Profile Updated.");
+      dispatch(getUser());
+      dispatch(clearAllUpdateProfileErrors());
+    }
+  }, [dispatch, loading, error, isUpdated, user]);
+
+  const resumeHandler = (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      setResumePreview(reader.result);
+      setResume(file);
+    };
+  };
+
+  const nichesArray = [
+    "Software Development",
+    "Web Development",
+    "Cybersecurity",
+    "Data Science",
+    "Artificial Intelligence",
+    "Cloud Computing",
+    "DevOps",
+    "Mobile App Development",
+    "Blockchain",
+    "Database Administration",
+    "Network Administration",
+    "UI/UX Design",
+    "Game Development",
+    "IoT (Internet of Things)",
+    "Big Data",
+    "Machine Learning",
+    "IT Project Management",
+    "IT Support and Helpdesk",
+    "Systems Administration",
+    "IT Consulting",
+  ];
+
+  return (
+    <div className="account_components">
+      <h3>Update Profile</h3>
+      <div>
+        <label>Full Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>Email Address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>Phone Number</label>
+        <input
+          type="number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>Address</label>
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
+      </div>
+
+      {user && user.role === "Job Seeker" && (
+        <>
+          <div>
+            <label>My Preferred Job Niches</label>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+            >
+              <select
+                value={firstNiche}
+                onChange={(e) => setFirstNiche(e.target.value)}
+              >
+                {nichesArray.map((element, index) => {
+                  return (
+                    <option value={element} key={index}>
+                      {element}
+                    </option>
+                  );
+                })}
+              </select>
+              <select
+                value={secondNiche}
+                onChange={(e) => setSecondNiche(e.target.value)}
+              >
+                {nichesArray.map((element, index) => {
+                  return (
+                    <option value={element} key={index}>
+                      {element}
+                    </option>
+                  );
+                })}
+              </select>
+              <select
+                value={thirdNiche}
+                onChange={(e) => setThirdNiche(e.target.value)}
+              >
+                {nichesArray.map((element, index) => {
+                  return (
+                    <option value={element} key={index}>
+                      {element}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>Coverletter</label>
+            <textarea
+              value={coverLetter}
+              onChange={(e) => setCoverLetter(e.target.value)}
+              rows={5}
+            />
+          </div>
+          <div>
+            <label>Upload Resume</label>
+            <input type="file" onChange={resumeHandler} />
+            {user && user.resume && (
+              <div>
+                <p>Current Resume:</p>
+                <Link
+                  to={user.resume && user.resume.url}
+                  target="_blank"
+                  className="view-resume"
+                >
+                  View Resume
+                </Link>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      <div className="save_change_btn_wrapper">
+        <button
+          className="btn"
+          onClick={handleUpdateProfile}
+          disabled={loading}
+        >
+          {" "}
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default UpdateProfile;
+</file>
+
+<file path="frontend/src/main.jsx">
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import {Provider} from "react-redux"
+import store from "./store/store.js"
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+)
+</file>
+
+<file path="frontend/src/pages/Login.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
+import { clearAllUserErrors, login } from "../store/slices/userSlice";
+import { toast } from "react-toastify";
+import { FaRegUser } from "react-icons/fa";
+import { MdOutlineMailOutline } from "react-icons/md";
+import { RiLock2Fill } from "react-icons/ri";
+
+const Login = () => {
+  const [role, setRole] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const { loading, isAuthenticated, error } = useSelector(
+    (state) => state.user
+  );
+
+  const dispatch = useDispatch();
+  const navigateTo = useNavigate();
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("role", role);
+    formData.append("email", email);
+    formData.append("password", password);
+    dispatch(login(formData));
+  };
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllUserErrors());
+    }
+    if (isAuthenticated) {
+      navigateTo("/");
+    }
+  }, [dispatch, error, loading, isAuthenticated]);
+
+  return (
+    <>
+      <section className="authPage">
+        <div className="container login-container">
+          <div className="header">
+            <h3>Login to your account</h3>
+          </div>
+          <form onSubmit={handleLogin}>
+            <div className="inputTag">
+              <label>Login As</label>
+              <div>
+                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="">Select Role</option>
+                  <option value="Employer">Login as an Employer</option>
+                  <option value="Job Seeker">Login as a Job Seeker</option>
+                </select>
+                <FaRegUser />
+              </div>
+            </div>
+            <div className="inputTag">
+              <label>Email</label>
+              <div>
+                <input
+                  type="email"
+                  placeholder="youremail@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <MdOutlineMailOutline />
+              </div>
+            </div>
+            <div className="inputTag">
+              <label>Password</label>
+              <div>
+                <input
+                  type="password"
+                  placeholder="Your Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <RiLock2Fill />
+              </div>
+            </div>
+            <button type="submit" disabled={loading}>
+              Login
+            </button>
+            <Link to={"/register"}>Register Now</Link>
+          </form>
+        </div>
+      </section>
+    </>
+  );
+};
+
+export default Login;
+</file>
+
+<file path="frontend/src/pages/NotFound.jsx">
+import React from "react";
+import { Link } from "react-router-dom";
+
+const NotFound = () => {
+  return (
+    <section className="notfound">
+      <div className="content">
+        <h1>404 Not Found</h1>
+        <p>Your Visited Page Not Found. You may go home page.</p>
+        <Link to={"/"} className="btn">
+          Back to home page
+        </Link>
+      </div>
+    </section>
+  );
+};
+
+export default NotFound;
+</file>
+
+<file path="frontend/src/pages/PostApplication.jsx">
+import React, { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  clearAllApplicationErrors,
+  postApplication,
+  resetApplicationSlice,
+} from "../store/slices/applicationSlice";
+import { toast } from "react-toastify";
+import { fetchSingleJob } from "../store/slices/jobSlice";
+import { IoMdCash } from "react-icons/io";
+import { FaToolbox } from "react-icons/fa";
+import { FaLocationDot } from "react-icons/fa6";
+
+const PostApplication = () => {
+  const { singleJob } = useSelector((state) => state.jobs);
+  const { isAuthenticated, user } = useSelector((state) => state.user);
+  const { loading, error, message } = useSelector(
+    (state) => state.applications
+  );
+
+  const { jobId } = useParams();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [coverLetter, setCoverLetter] = useState("");
+  const [resume, setResume] = useState("");
+
+  const navigateTo = useNavigate();
+  const dispatch = useDispatch();
+
+  const handlePostApplication = (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("email", email);
+    formData.append("phone", phone);
+    formData.append("address", address);
+    formData.append("coverLetter", coverLetter);
+    if (resume) {
+      formData.append("resume", resume);
+    }
+    dispatch(postApplication(formData, jobId));
+  };
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "");
+      setEmail(user.email || "");
+      setPhone(user.phone || "");
+      setAddress(user.address || "");
+      setCoverLetter(user.coverLetter || "");
+      setResume((user.resume && user.resume.url) || "");
+    }
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllApplicationErrors());
+    }
+    if (message) {
+      toast.success(message);
+      dispatch(resetApplicationSlice());
+    }
+    dispatch(fetchSingleJob(jobId));
+  }, [dispatch, error, message, jobId, user]);
+
+  let qualifications = [];
+  let responsibilities = [];
+  let offering = [];
+  if (singleJob.qualifications) {
+    qualifications = singleJob.qualifications.split(". ");
+  }
+  if (singleJob.responsibilities) {
+    responsibilities = singleJob.responsibilities.split(". ");
+  }
+  if (singleJob.offers) {
+    offering = singleJob.offers.split(". ");
+  }
+
+  const resumeHandler = (e) => {
+    const file = e.target.files[0];
+    setResume(file);
+  };
+
+  return (
+    <>
+      <article className="application_page">
+        <form>
+          <h3>Application Form</h3>
+          <div>
+            <label>Job Title</label>
+            <input type="text" placeholder={singleJob.title} disabled />
+          </div>
+          <div>
+            <label>Your Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label>Your Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label>Phone Number</label>
+            <input
+              type="number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          <div>
+            <label>Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+          {user && user.role === "Job Seeker" && (
+            <>
+              <div>
+                <label>Coverletter</label>
+                <textarea
+                  value={coverLetter}
+                  onChange={(e) => setCoverLetter(e.target.value)}
+                  rows={10}
+                />
+              </div>
+              <div>
+                <label>Resume</label>
+                <input type="file" onChange={resumeHandler} />
+              </div>
+            </>
+          )}
+
+          {isAuthenticated && user.role === "Job Seeker" && (
+            <div style={{ alignItems: "flex-end" }}>
+              <button
+                className="btn"
+                onClick={handlePostApplication}
+                disabled={loading}
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </form>
+
+        <div className="job-details">
+          <header>
+            <h3>{singleJob.title}</h3>
+            {singleJob.personalWebsite && (
+              <Link target="_blank" to={singleJob.personalWebsite.url}>
+                {singleJob.personalWebsite.title}
+              </Link>
+            )}
+            <p>{singleJob.location}</p>
+            <p>Rs. {singleJob.salary} a month</p>
+          </header>
+          <hr />
+          <section>
+            <div className="wrapper">
+              <h3>Job details</h3>
+              <div>
+                <IoMdCash />
+                <div>
+                  <span>Pay</span>
+                  <span>{singleJob.salary} a month</span>
+                </div>
+              </div>
+              <div>
+                <FaToolbox />
+                <div>
+                  <span>Job type</span>
+                  <span>{singleJob.jobType}</span>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <div className="wrapper">
+              <h3>Location</h3>
+              <div className="location-wrapper">
+                <FaLocationDot />
+                <span>{singleJob.location}</span>
+              </div>
+            </div>
+            <hr />
+            <div className="wrapper">
+              <h3>Full Job Description</h3>
+              <p>{singleJob.introduction}</p>
+              {singleJob.qualifications && (
+                <div>
+                  <h4>Qualifications</h4>
+                  <ul>
+                    {qualifications.map((element) => {
+                      return (
+                        <li key={element} style={{ listStyle: "inside" }}>
+                          {element}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+              {singleJob.responsibilities && (
+                <div>
+                  <h4>Responsibilities</h4>
+                  <ul>
+                    {responsibilities.map((element) => {
+                      return (
+                        <li key={element} style={{ listStyle: "inside" }}>
+                          {element}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+              {singleJob.offers && (
+                <div>
+                  <h4>Offering</h4>
+                  <ul>
+                    {offering.map((element) => {
+                      return (
+                        <li key={element} style={{ listStyle: "inside" }}>
+                          {element}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+          <hr />
+          <footer>
+            <h3>Job Niche</h3>
+            <p>{singleJob.jobNiche}</p>
+          </footer>
+        </div>
+      </article>
+    </>
+  );
+};
+
+export default PostApplication;
+</file>
+
+<file path="frontend/src/pages/Register.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
+import { clearAllUserErrors, register } from "../store/slices/userSlice";
+import { toast } from "react-toastify";
+import { FaAddressBook, FaPencilAlt, FaRegUser } from "react-icons/fa";
+import { FaPhoneFlip } from "react-icons/fa6";
+import { MdCategory, MdOutlineMailOutline } from "react-icons/md";
+import { RiLock2Fill } from "react-icons/ri";
+
+const Register = () => {
+  const [role, setRole] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstNiche, setFirstNiche] = useState("");
+  const [secondNiche, setSecondNiche] = useState("");
+  const [thirdNiche, setThirdNiche] = useState("");
+  const [coverLetter, setCoverLetter] = useState("");
+  const [resume, setResume] = useState("");
+
+  const nichesArray = [
+    "Software Development",
+    "Web Development",
+    "Cybersecurity",
+    "Data Science",
+    "Artificial Intelligence",
+    "Cloud Computing",
+    "DevOps",
+    "Mobile App Development",
+    "Blockchain",
+    "Database Administration",
+    "Network Administration",
+    "UI/UX Design",
+    "Game Development",
+    "IoT (Internet of Things)",
+    "Big Data",
+    "Machine Learning",
+    "IT Project Management",
+    "IT Support and Helpdesk",
+    "Systems Administration",
+    "IT Consulting",
+  ];
+
+  const resumeHandler = (e) => {
+    const file = e.target.files[0];
+    setResume(file);
+  };
+
+  const { loading, isAuthenticated, error, message } = useSelector(
+    (state) => state.user
+  );
+
+  const dispatch = useDispatch();
+  const navigateTo = useNavigate();
+
+  const handleRegsiter = (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("role", role);
+    formData.append("name", name);
+    formData.append("email", email);
+    formData.append("phone", phone);
+    formData.append("address", address);
+    formData.append("password", password);
+    if (role === "Job Seeker") {
+      formData.append("firstNiche", firstNiche);
+      formData.append("secondNiche", secondNiche);
+      formData.append("thirdNiche", thirdNiche);
+      formData.append("coverLetter", coverLetter);
+      formData.append("resume", resume);
+    }
+    dispatch(register(formData));
+  };
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllUserErrors());
+    }
+    if (isAuthenticated) {
+      navigateTo("/");
+    }
+  }, [dispatch, error, loading, isAuthenticated, message]);
+
+  return (
+    <>
+      <section className="authPage">
+        <div className="container">
+          <div className="header">
+            <h3>Create a new account</h3>
+          </div>
+          <form onSubmit={handleRegsiter}>
+            <div className="wrapper">
+              <div className="inputTag">
+                <label>Register As</label>
+                <div>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <option value="">Select Role</option>
+                    <option value="Employer">Register as an Employer</option>
+                    <option value="Job Seeker">Register as a Job Seeker</option>
+                  </select>
+                  <FaRegUser />
+                </div>
+              </div>
+              <div className="inputTag">
+                <label>Name</label>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Your Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <FaPencilAlt />
+                </div>
+              </div>
+            </div>
+            <div className="wrapper">
+              <div className="inputTag">
+                <label>Email Address</label>
+                <div>
+                  <input
+                    type="email"
+                    placeholder="youremail@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <MdOutlineMailOutline />
+                </div>
+              </div>
+              <div className="inputTag">
+                <label>Phone Number</label>
+                <div>
+                  <input
+                    type="number"
+                    placeholder="111-222-333"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                  <FaPhoneFlip />
+                </div>
+              </div>
+            </div>
+            <div className="wrapper">
+              <div className="inputTag">
+                <label>Address</label>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Your Address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                  <FaAddressBook />
+                </div>
+              </div>
+              <div className="inputTag">
+                <label>Password</label>
+                <div>
+                  <input
+                    type="password"
+                    placeholder="Your Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <RiLock2Fill />
+                </div>
+              </div>
+            </div>
+            {role === "Job Seeker" && (
+              <>
+                <div className="wrapper">
+                  <div className="inputTag">
+                    <label>Your First Niche</label>
+                    <div>
+                      <select
+                        value={firstNiche}
+                        onChange={(e) => setFirstNiche(e.target.value)}
+                      >
+                        <option value="">Your Niche</option>
+                        {nichesArray.map((niche, index) => {
+                          return (
+                            <option key={index} value={niche}>
+                              {niche}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <MdCategory />
+                    </div>
+                  </div>
+                  <div className="inputTag">
+                    <label>Your Second Niche</label>
+                    <div>
+                      <select
+                        value={secondNiche}
+                        onChange={(e) => setSecondNiche(e.target.value)}
+                      >
+                        <option value="">Your Niche</option>
+                        {nichesArray.map((niche, index) => {
+                          return (
+                            <option key={index} value={niche}>
+                              {niche}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <MdCategory />
+                    </div>
+                  </div>
+                  <div className="inputTag">
+                    <label>Your Third Niche</label>
+                    <div>
+                      <select
+                        value={thirdNiche}
+                        onChange={(e) => setThirdNiche(e.target.value)}
+                      >
+                        <option value="">Your Niche</option>
+                        {nichesArray.map((niche, index) => {
+                          return (
+                            <option key={index} value={niche}>
+                              {niche}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <MdCategory />
+                    </div>
+                  </div>
+                </div>
+                <div className="wrapper">
+                  <div className="inputTag">
+                    <label>Coverletter</label>
+                    <div>
+                      <textarea
+                        value={coverLetter}
+                        onChange={(e) => setCoverLetter(e.target.value)}
+                        rows={10}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="wrapper">
+                  <div className="inputTag">
+                    <label>Resume</label>
+                    <div>
+                      <input
+                        type="file"
+                        onChange={resumeHandler}
+                        style={{ border: "none" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+            <button type="submit" disabled={loading}>
+              Register
+            </button>
+            <Link to={"/login"}>Login Now</Link>
+          </form>
+        </div>
+      </section>
+    </>
+  );
+};
+
+export default Register;
+</file>
+
+<file path="frontend/vite.config.js">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  base: '/', // Ensures app works correctly from the root of your domain
+  server: {
+    port: 5174,
+    strictPort: true,
+  },
+})
+</file>
+
+<file path="jest.config.js">
+export default {
+  transform: {
+    '^.+\\.[tj]sx?$': ['babel-jest']
+  },
+  testPathIgnorePatterns: ['/node_modules/'],
+  moduleNameMapper: {
+    '\\.(css|less|scss)$': 'identity-obj-proxy'
+  },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  collectCoverageFrom: [
+    'backend/**/*.js',
+    'frontend/src/**/*.jsx',
+    'frontend/src/**/*.js',
+    '!backend/node_modules/**',
+    '!frontend/node_modules/**'
+  ]
+};
+</file>
+
+<file path="ml_service/main.py">
+import os
+import re
+from typing import List, Optional
+
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel
+
+try:
+    import spacy
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except Exception:
+        nlp = spacy.blank("en")
+except Exception:  # pragma: no cover - spaCy is optional
+    spacy = None
+    nlp = None
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# The service uses MongoDB to read job postings.
+# During tests this connection is not executed, but the code demonstrates
+# how to integrate with a running Mongo instance.
+from pymongo import MongoClient
+
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/jobscape")
+client = MongoClient(MONGO_URI)
+db = client.get_default_database()
+jobs_collection = db["jobs"]
+
+app = FastAPI(title="JobScape ML Service")
+
+
+def _preprocess(text: str) -> str:
+    """Lower‑case and remove non alphanumeric characters."""
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return text
+
+
+def _vectorize(docs: List[str]):
+    vectorizer = TfidfVectorizer(stop_words="english")
+    matrix = vectorizer.fit_transform(docs)
+    return matrix
+
+
+class RecommendRequest(BaseModel):
+    resume: str
+    top_n: Optional[int] = 5
+
+
+class RecommendResponseItem(BaseModel):
+    jobId: str
+    title: str
+    score: float
+
+
+class RecommendResponse(BaseModel):
+    recommendations: List[RecommendResponseItem]
+
+
+class SkillRequest(BaseModel):
+    resume: str
+    category: str
+
+
+class SkillResponse(BaseModel):
+    missing_skills: List[str]
+
+
+@app.post("/recommend", response_model=RecommendResponse)
+async def recommend(data: RecommendRequest):
+    """Return top N matching jobs based on cosine similarity."""
+    resume_text = _preprocess(data.resume)
+    jobs = list(jobs_collection.find({}, {"title": 1, "description": 1}))
+    if not jobs:
+        return {"recommendations": []}
+    docs = [resume_text] + [
+        _preprocess(j.get("description", "")) for j in jobs
+    ]
+    matrix = _vectorize(docs)
+    sims = cosine_similarity(matrix[0:1], matrix[1:]).flatten()
+    top_indices = sims.argsort()[::-1][: data.top_n]
+    recs = []
+    for idx in top_indices:
+        job = jobs[idx]
+        recs.append(
+            {
+                "jobId": str(job.get("_id")),
+                "title": job.get("title", ""),
+                "score": float(sims[idx]),
+            }
+        )
+    return {"recommendations": recs}
+
+
+@app.post("/suggestSkills", response_model=SkillResponse)
+async def suggest_skills(data: SkillRequest):
+    """Very small demo that compares the resume with a skills list."""
+    skills_by_category = {
+        "software": {"python", "javascript", "react", "node"},
+        "data": {"python", "sql", "pandas", "machine", "learning"},
+    }
+    required = skills_by_category.get(data.category.lower(), set())
+    tokens = set(_preprocess(data.resume).split())
+    missing = sorted(list(required - tokens))
+    return {"missing_skills": missing}
+
+
+@app.post("/upload", response_model=RecommendResponse)
+async def upload_resume(file: UploadFile = File(...), top_n: int = Form(5)):
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    req = RecommendRequest(resume=text, top_n=top_n)
+    return await recommend(req)
+</file>
+
+<file path="ml_service/README.md">
+# ML Service
+
+This FastAPI service powers the recommendation features of JobScape.
+
+## Running
+
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
+
+## Endpoints
+
+- `POST /recommend` – accepts JSON with a `resume` field and returns the top
+  matching jobs from the MongoDB `jobs` collection.
+- `POST /suggestSkills` – returns a list of missing skills for a given resume
+  and desired job `category`.
+
+## Training
+
+The initial model uses TF‑IDF vectors and cosine similarity.  To retrain or
+extend the model, prepare a CSV file similar to `sample_data/training.csv` and
+update the preprocessing or vectorisation steps in `main.py`.  Replace or extend
+`skills_by_category` with categories relevant to your platform.
+</file>
+
+<file path="ml_service/requirements.txt">
+fastapi
+uvicorn
+scikit-learn
+spacy
+pymongo
+</file>
+
+<file path="ml_service/sample_data/training.csv">
+text,category
+"Experienced software engineer skilled in Python and React",software
+"Data analyst with proficiency in SQL and machine learning",data
+"Marketing professional with SEO and content strategy experience",marketing
+</file>
+
+<file path="package.json">
+{
+  "name": "jobscape-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest --runInBand --coverage"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.9",
+    "@babel/preset-env": "^7.23.9",
+    "@babel/preset-react": "^7.23.3",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "axios": "^1.7.2",
+    "babel-jest": "^29.7.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "mongodb-memory-server": "^8.12.1",
+    "supertest": "^6.3.3"
+  }
+}
+</file>
+
+<file path="scripts/deploy.sh">
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVIRONMENT=${1:-}
+STRATEGY=${2:-blue-green}
+
+if [ -z "$ENVIRONMENT" ]; then
+  echo "Usage: $0 <staging|production> [strategy]" >&2
+  exit 1
+fi
+
+echo "Deploying to $ENVIRONMENT using $STRATEGY strategy"
+
+case "$ENVIRONMENT" in
+  staging)
+    echo "Simulating deployment to staging environment..."
+    # Placeholder for staging deployment commands
+    ;;
+  production)
+    echo "Simulating $STRATEGY deployment to production..."
+    # Placeholder for blue-green or canary deployment commands
+    ;;
+  *)
+    echo "Unknown environment: $ENVIRONMENT" >&2
+    exit 1
+    ;;
+esac
+</file>
+
+<file path="scripts/generate-changelog.sh">
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION=${1:-}
+if [ -z "$VERSION" ]; then
+  echo "Usage: $0 <version>" >&2
+  exit 1
+fi
+
+# Determine range for changelog
+if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+  PREV_TAG=$(git describe --tags --abbrev=0)
+  RANGE="$PREV_TAG..HEAD"
+else
+  RANGE=""
+fi
+
+echo "# Changelog for $VERSION" > CHANGELOG.md
+git log $RANGE --pretty=format:'- %s (%h)' >> CHANGELOG.md
+echo >> CHANGELOG.md
+</file>
+
+<file path="backend/app.js">
+import express from "express";
+import { config } from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import { connection } from "./database/connection.js";
+import { errorMiddleware } from "./middlewares/error.js";
+import fileUpload from "express-fileupload";
+import userRouter from "./routes/userRouter.js";
+import jobRouter from "./routes/jobRouter.js";
+import applicationRouter from "./routes/applicationRouter.js";
+import recommendationRouter from "./routes/recommendationRouter.js";
+import { newsLetterCron } from "./automation/newsLetterCron.js";
+
+
+const app = express();
+config({ path: "./config/config.env" });
+
+app.use(
+  cors({
+    origin: [process.env.FRONTEND_URL, "http://localhost:5173", "http://localhost:5174"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+  })
+);
+
+app.use("/api/v1/user", userRouter);
+app.use("/api/v1/job", jobRouter);
+app.use("/api/v1/application", applicationRouter);
+app.use("/api/v1", recommendationRouter);
+
+newsLetterCron()
+connection();
+app.use(errorMiddleware);
+
+export default app;
+</file>
+
+<file path="backend/package.json">
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "ml": "uvicorn ../ml_service.main:app --port 8001 --reload"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.0",
+    "cloudinary": "^2.7.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-fileupload": "^1.5.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.14",
+    "validator": "^13.12.0"
+  }
+}
+</file>
+
+<file path="frontend/src/components/Footer.jsx">
+import React from "react";
+
+const Footer = () => {
+  return (
+    <footer className="site-footer">
+      &copy; {new Date().getFullYear()} JobScape. All Rights Reserved.
+    </footer>
+  );
+};
+
+export default Footer;
+</file>
+
+<file path="frontend/src/components/JobPost.jsx">
+import React, { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import {
+  clearAllJobErrors,
+  postJob,
+  resetJobSlice,
+} from "../store/slices/jobSlice";
+import { CiCircleInfo } from "react-icons/ci";
+import Button from "./ui/Button";
+
+const JobPost = () => {
+  const [title, setTitle] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [location, setLocation] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [introduction, setIntroduction] = useState("");
+  const [responsibilities, setResponsibilities] = useState("");
+  const [qualifications, setQualifications] = useState("");
+  const [offers, setOffers] = useState("");
+  const [jobNiche, setJobNiche] = useState("");
+  const [salary, setSalary] = useState("");
+  const [hiringMultipleCandidates, setHiringMultipleCandidates] = useState("");
+  const [personalWebsiteTitle, setPersonalWebsiteTitle] = useState("");
+  const [personalWebsiteUrl, setPersonalWebsiteUrl] = useState("");
+
+  const nichesArray = [
+    "Software Development",
+    "Web Development",
+    "Cybersecurity",
+    "Data Science",
+    "Artificial Intelligence",
+    "Cloud Computing",
+    "DevOps",
+    "Mobile App Development",
+    "Blockchain",
+    "Database Administration",
+    "Network Administration",
+    "UI/UX Design",
+    "Game Development",
+    "IoT (Internet of Things)",
+    "Big Data",
+    "Machine Learning",
+    "IT Project Management",
+    "IT Support and Helpdesk",
+    "Systems Administration",
+    "IT Consulting",
+  ];
+
+  const cities = [
+    "All",
+    "Colombo",
+    "Kandy",
+    "Galle",
+    "Jaffna",
+    "Negombo",
+    "Anuradhapura",
+    "Ratnapura",
+    "Trincomalee",
+    "Batticaloa",
+    "Matara",
+    "Kurunegala",
+    "Badulla",
+    "Puttalam",
+    "Nuwara Eliya",
+    "Polonnaruwa",
+    "Ampara",
+    "Hambantota",
+    "Kalutara",
+    "Mannar",
+    "Kilinochchi",
+  ];
+
+  const { isAuthenticated, user } = useSelector((state) => state.user);
+  const { loading, error, message } = useSelector((state) => state.jobs);
+  const dispatch = useDispatch();
+
+  const handlePostJob = (e) => {
+    e.preventDefault();
+    if (
+      !title ||
+      !jobType ||
+      !location ||
+      !companyName ||
+      !introduction ||
+      !responsibilities ||
+      !qualifications ||
+      !jobNiche ||
+      !salary
+    ) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("jobType", jobType);
+    formData.append("location", location);
+    formData.append("companyName", companyName);
+    formData.append("introduction", introduction);
+    formData.append("responsibilities", responsibilities);
+    formData.append("qualifications", qualifications);
+    offers && formData.append("offers", offers);
+    formData.append("jobNiche", jobNiche);
+    formData.append("salary", salary);
+    hiringMultipleCandidates &&
+      formData.append("hiringMultipleCandidates", hiringMultipleCandidates);
+    personalWebsiteTitle &&
+      formData.append("personalWebsiteTitle", personalWebsiteTitle);
+    personalWebsiteUrl &&
+      formData.append("personalWebsiteUrl", personalWebsiteUrl);
+
+    dispatch(postJob(formData));
+  };
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllJobErrors());
+    }
+    if (message) {
+      toast.success(message);
+      dispatch(resetJobSlice());
+    }
+  }, [dispatch, error, loading, message]);
+
+  return (
+    <div className="account_components">
+      <h3>Post A Job</h3>
+      <div>
+        <label>Title</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Job Title"
+        />
+      </div>
+      <div>
+        <label>Job Type</label>
+        <select value={jobType} onChange={(e) => setJobType(e.target.value)}>
+          <option value="">Select Job Type</option>
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+        </select>
+      </div>
+      <div>
+        <label>Location (City)</label>
+        <select value={location} onChange={(e) => setLocation(e.target.value)}>
+          <option value="">Select Job Type</option>
+          {cities.map((element) => {
+            return <option value={element}>{element}</option>;
+          })}
+        </select>
+      </div>
+      <div>
+        <label>Company Name</label>
+        <input
+          type="text"
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          placeholder="Company Name"
+        />
+      </div>
+      <div>
+        <label>Company/Job Introduction</label>
+        <textarea
+          value={introduction}
+          onChange={(e) => setIntroduction(e.target.value)}
+          placeholder="Company / Job Introduction"
+          rows={7}
+        />
+      </div>
+      <div>
+        <label>Responsibilities</label>
+        <textarea
+          value={responsibilities}
+          onChange={(e) => setResponsibilities(e.target.value)}
+          placeholder="Job Responsibilities"
+          rows={7}
+        />
+      </div>
+      <div>
+        <label>Qualifications</label>
+        <textarea
+          value={qualifications}
+          onChange={(e) => setQualifications(e.target.value)}
+          placeholder="Required Qualifications For Job"
+          rows={7}
+        />
+      </div>
+      <div>
+        <div className="label-infoTag-wrapper">
+          <label>What We Offer</label>
+          <span>
+            <CiCircleInfo /> Optional
+          </span>
+        </div>
+        <textarea
+          value={offers}
+          onChange={(e) => setOffers(e.target.value)}
+          placeholder="What are we offering in return!"
+          rows={7}
+        />
+      </div>
+      <div>
+        <label>Job Niche</label>
+        <select value={jobNiche} onChange={(e) => setJobNiche(e.target.value)}>
+          <option value="">Select Job Niche</option>
+          {nichesArray.map((element) => {
+            return <option value={element}>{element}</option>;
+          })}
+        </select>
+      </div>
+      <div>
+        <label>Salary</label>
+        <input
+          type="text"
+          value={salary}
+          onChange={(e) => setSalary(e.target.value)}
+          placeholder="50000 - 800000"
+        />
+      </div>
+      <div>
+        <div className="label-infoTag-wrapper">
+          <label>Hiring Multiple Candidates?</label>
+          <span>
+            <CiCircleInfo /> Optional
+          </span>
+        </div>
+        <select
+          value={hiringMultipleCandidates}
+          onChange={(e) => setHiringMultipleCandidates(e.target.value)}
+        >
+          <option value="">Hiring Multiple Candidates?</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div>
+        <div className="label-infoTag-wrapper">
+          <label>Personal Website Name</label>
+          <span>
+            <CiCircleInfo /> Optional
+          </span>
+        </div>
+        <input
+          type="text"
+          value={personalWebsiteTitle}
+          onChange={(e) => setPersonalWebsiteTitle(e.target.value)}
+          placeholder="Peronsal Website Name/Title"
+        />
+      </div>
+      <div>
+        <div className="label-infoTag-wrapper">
+          <label>Personal Website Link (URL)</label>
+          <span>
+            <CiCircleInfo /> Optional
+          </span>
+        </div>
+        <input
+          type="text"
+          value={personalWebsiteUrl}
+          onChange={(e) => setPersonalWebsiteUrl(e.target.value)}
+          placeholder="Peronsal Website Link (URL)"
+        />
+      </div>
+      <div>
+        <Button
+          style={{ margin: "0 auto" }}
+          onClick={handlePostJob}
+          disabled={loading}
+        >
+          Post Job
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default JobPost;
+</file>
+
+<file path="frontend/src/components/MyApplications.jsx">
+import React, { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { toast } from "react-toastify";
+import {
+  clearAllApplicationErrors,
+  resetApplicationSlice,
+  deleteApplication,
+  fetchJobSeekerApplications,
+} from "../store/slices/applicationSlice";
+import Spinner from "../components/Spinner";
+import Button from "./ui/Button";
+
+const MyApplications = () => {
+  const { loading, error, applications, message } = useSelector(
+    (state) => state.applications
+  );
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(fetchJobSeekerApplications());
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllApplicationErrors());
+    }
+    if (message) {
+      toast.success(message);
+      dispatch(resetApplicationSlice());
+      dispatch(fetchJobSeekerApplications());
+    }
+  }, [dispatch, error, message]);
+
+  const handleDeleteApplication = (id) => {
+    dispatch(deleteApplication(id));
+  };
+
+  return (
+    <>
+      {loading ? (
+        <Spinner />
+      ) : applications && applications.length <= 0 ? (
+        <h1 style={{ fontSize: "1.4rem", fontWeight: "600" }}>
+          You have not applied for any job.
+        </h1>
+      ) : (
+        <>
+          <div className="account_components">
+            <h3>My Application For Jobs</h3>
+            <div className="applications_container">
+              {applications.map((element) => {
+                return (
+                  <div className="card" key={element._id}>
+                    <p className="sub-sec">
+                      <span>Job Title: </span> {element.jobInfo.jobTitle}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Name</span> {element.jobSeekerInfo.name}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Email</span> {element.jobSeekerInfo.email}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Phone: </span> {element.jobSeekerInfo.phone}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Address: </span> {element.jobSeekerInfo.address}
+                    </p>
+                    <p className="sub-sec">
+                      <span>Coverletter: </span>
+                      <textarea
+                        value={element.jobSeekerInfo.coverLetter}
+                        rows={5}
+                        disabled
+                      ></textarea>
+                    </p>
+                    <div className="btn-wrapper">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleDeleteApplication(element._id)}
+                      >
+                        Delete Application
+                      </Button>
+                      <Button
+                        href={element.jobSeekerInfo?.resume?.url}
+                        target="_blank"
+                      >
+                        View Resume
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+export default MyApplications;
+</file>
+
+<file path="frontend/src/pages/Dashboard.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { logout, clearAllUserErrors } from "../store/slices/userSlice";
+import { LuMoveRight } from "react-icons/lu";
+import MyProfile from "../components/MyProfile";
+import UpdateProfile from "../components/UpdateProfile";
+import UpdatePassword from "../components/UpdatePassword";
+import MyJobs from "../components/MyJobs";
+import JobPost from "../components/JobPost";
+import Applications from "../components/Applications";
+import MyApplications from "../components/MyApplications";
+import RecommendedJobs from "../components/RecommendedJobs";
+
+const Dashboard = () => {
+  const [show, setShow] = useState(false);
+  const [componentName, setComponentName] = useState("My Profile");
+
+  const { loading, isAuthenticated, error, user } = useSelector(
+    (state) => state.user
+  );
+
+  const dispatch = useDispatch();
+  const navigateTo = useNavigate();
+
+  const handleLogout = () => {
+    dispatch(logout());
+    toast.success("Logged out successfully.");
+  };
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllUserErrors());
+    }
+    if (!isAuthenticated) {
+      navigateTo("/");
+    }
+  }, [dispatch, error, loading, isAuthenticated]);
+
+  return (
+    <>
+      <section className="account">
+        <div className="component_header">
+          <p>Dashboard</p>
+          <p>
+            Welcome! <span>{user && user.name}</span>
+          </p>
+        </div>
+        <div className="container">
+          <div className={show ? "sidebar showSidebar" : "sidebar"}>
+            <ul className="sidebar_links">
+              <h4>Manage Account</h4>
+              <li>
+                <button
+                  onClick={() => {
+                    setComponentName("My Profile");
+                    setShow(!show);
+                  }}
+                >
+                  My Profile
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setComponentName("Update Profile");
+                    setShow(!show);
+                  }}
+                >
+                  Update Profile
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setComponentName("Update Password");
+                    setShow(!show);
+                  }}
+                >
+                  Update Password
+                </button>
+              </li>
+
+              {user && user.role === "Employer" && (
+                <li>
+                  <button
+                    onClick={() => {
+                      setComponentName("Job Post");
+                      setShow(!show);
+                    }}
+                  >
+                    Post New Job
+                  </button>
+                </li>
+              )}
+              {user && user.role === "Employer" && (
+                <li>
+                  <button
+                    onClick={() => {
+                      setComponentName("My Jobs");
+                      setShow(!show);
+                    }}
+                  >
+                    My Jobs
+                  </button>
+                </li>
+              )}
+              {user && user.role === "Employer" && (
+                <li>
+                  <button
+                    onClick={() => {
+                      setComponentName("Applications");
+                      setShow(!show);
+                    }}
+                  >
+                    Applications
+                  </button>
+                </li>
+              )}
+              {user && user.role === "Job Seeker" && (
+                <li>
+                  <button
+                    onClick={() => {
+                      setComponentName("My Applications");
+                      setShow(!show);
+                    }}
+                  >
+                    My Applications
+                  </button>
+                </li>
+              )}
+              {user && user.role === "Job Seeker" && (
+                <li>
+                  <button
+                    onClick={() => {
+                      setComponentName("Recommended Jobs");
+                      setShow(!show);
+                    }}
+                  >
+                    Recommended Jobs
+                  </button>
+                </li>
+              )}
+              <li>
+                <button onClick={handleLogout}>Logout</button>
+              </li>
+            </ul>
+          </div>
+          <div className="banner">
+            <div
+              className={
+                show ? "sidebar_icon move_right" : "sidebar_icon move_left"
+              }
+            >
+              <LuMoveRight
+                onClick={() => setShow(!show)}
+                className={show ? "left_arrow" : "right_arrow"}
+              />
+            </div>
+            {(() => {
+              switch (componentName) {
+                case "My Profile":
+                  return <MyProfile />;
+                  break;
+                case "Update Profile":
+                  return <UpdateProfile />;
+                  break;
+                case "Update Password":
+                  return <UpdatePassword />;
+                  break;
+                case "Job Post":
+                  return <JobPost />;
+                  break;
+                case "My Jobs":
+                  return <MyJobs />;
+                  break;
+                case "Applications":
+                  return <Applications />;
+                  break;
+                case "My Applications":
+                  return <MyApplications />;
+                  break;
+                case "Recommended Jobs":
+                  return <RecommendedJobs />;
+                  break;
+
+                default:
+                  <MyProfile />;
+                  break;
+              }
+            })()}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+};
+
+export default Dashboard;
+</file>
+
+<file path="frontend/src/store/store.js">
+import { configureStore } from "@reduxjs/toolkit";
+import jobReducer from "./slices/jobSlice";
+import userReducer from "./slices/userSlice";
+import applicationReducer from "./slices/applicationSlice";
+import updateProfileReducer from "./slices/updateProfileSlice";
+import recommendationReducer from "./slices/recommendationSlice";
+
+const store = configureStore({
+  reducer: {
+    user: userReducer,
+    jobs: jobReducer,
+    applications: applicationReducer,
+    updateProfile: updateProfileReducer,
+    recommendation: recommendationReducer
+  },
+});
+
+export default store;
+</file>
+
+<file path=".env.example">
+# Sample environment variables for JobScape
+MONGO_URI=mongodb://localhost:27017/jobscape
+FRONTEND_URL=http://localhost:5173
+FRONTEND_URL_2=http://localhost:5174
+PORT=4000
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+JWT_SECRET_KEY=supersecret
+JWT_EXPIRE=7d
+COOKIE_EXPIRE=7
+SMTP_HOST=smtp.example.com
+SMTP_SERVICE=gmail
+SMTP_PORT=587
+SMTP_MAIL=your_email@example.com
+SMTP_PASSWORD=your_password
+# URL of the Python ML microservice
+ML_SERVICE_URL=http://localhost:8001
+</file>
+
+<file path="backend/controllers/jobController.js">
+import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
+import ErrorHandler from "../middlewares/error.js";
+import { Job } from "../models/jobSchema.js";
+
+export const postJob = catchAsyncErrors(async (req, res, next) => {
+  const {
+    title,
+    jobType,
+    location,
+    companyName,
+    introduction,
+    responsibilities,
+    qualifications,
+    offers,
+    salary,
+    hiringMultipleCandidates,
+    personalWebsiteTitle,
+    personalWebsiteUrl,
+    jobNiche,
+  } = req.body;
+  if (
+    !title ||
+    !jobType ||
+    !location ||
+    !companyName ||
+    !introduction ||
+    !responsibilities ||
+    !qualifications ||
+    !salary ||
+    !jobNiche
+  ) {
+    return next(new ErrorHandler("Please provide full job details.", 400));
+  }
+  if (
+    (personalWebsiteTitle && !personalWebsiteUrl) ||
+    (!personalWebsiteTitle && personalWebsiteUrl)
+  ) {
+    return next(
+      new ErrorHandler(
+        "Provide both the website url and title, or leave both blank.",
+        400
+      )
+    );
+  }
+  const postedBy = req.user._id;
+  const job = await Job.create({
+    title,
+    jobType,
+    location,
+    companyName,
+    introduction,
+    responsibilities,
+    qualifications,
+    offers,
+    salary,
+    hiringMultipleCandidates,
+    personalWebsite: {
+      title: personalWebsiteTitle,
+      url: personalWebsiteUrl,
+    },
+    jobNiche,
+    postedBy,
+  });
+  res.status(201).json({
+    success: true,
+    message: "Job posted successfully.",
+    job,
+  });
+});
+
+export const getAllJobs = catchAsyncErrors(async (req, res, next) => {
+  const { city, niche, searchKeyword } = req.query;
+  const query = {};
+  if (city) {
+    query.location = city;
+  }
+  if (niche) {
+    query.jobNiche = niche;
+  }
+  if (searchKeyword) {
+    query.$or = [
+      { title: { $regex: searchKeyword, $options: "i" } },
+      { companyName: { $regex: searchKeyword, $options: "i" } },
+      { introduction: { $regex: searchKeyword, $options: "i" } },
+    ];
+  }
+  const jobs = await Job.find(query);
+  res.status(200).json({
+    success: true,
+    jobs,
+    count: jobs.length,
+  });
+});
+
+export const getMyJobs = catchAsyncErrors(async (req, res, next) => {
+  const myJobs = await Job.find({ postedBy: req.user._id });
+  res.status(200).json({
+    success: true,
+    myJobs,
+  });
+});
+
+export const deleteJob = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const job = await Job.findById(id);
+  if (!job) {
+    return next(new ErrorHandler("Oops! Job not found.", 404));
+  }
+  await job.deleteOne();
+  res.status(200).json({
+    success: true,
+    message: "Job deleted.",
+  });
+});
+
+export const getASingleJob = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const job = await Job.findById(id);
+  if (!job) {
+    return next(new ErrorHandler("Job not found.", 404));
+  }
+  res.status(200).json({
+    success: true,
+    job,
+  });
+});
+</file>
+
+<file path="backend/routes/jobRouter.js">
+import express from "express";
+import { isAuthenticated, isAuthorized } from "../middlewares/auth.js";
+import { postJob, getAllJobs, getASingleJob, getMyJobs, deleteJob } from "../controllers/jobController.js";
+
+const router = express.Router();
+
+router.post("/post", isAuthenticated, isAuthorized("Employer"), postJob);
+router.get("/getall", getAllJobs);
+router.get("/getmyjobs", isAuthenticated, isAuthorized("Employer"), getMyJobs);
+router.delete("/delete/:id", isAuthenticated, isAuthorized("Employer"), deleteJob);
+router.get("/get/:id", getASingleJob)
+
+
+
+
+
+
+export default router;
+</file>
+
+<file path="frontend/src/components/TopNiches.jsx">
+import React from "react";
+import {
+  FaCode,
+  FaGlobe,
+  FaDatabase,
+  FaCloud,
+  FaCogs,
+  FaMobileAlt,
+} from "react-icons/fa";
+
+const TopNiches = () => {
+  const services = [
+    {
+      id: 1,
+      service: "Software Development",
+      icon: <FaCode />,
+      description:
+        "Innovative software development services to build, maintain, and upgrade applications, ensuring they meet the highest quality standards.",
+    },
+    {
+      id: 2,
+      service: "Web Development",
+      icon: <FaGlobe />,
+      description:
+        "Comprehensive web development solutions from front-end design to back-end integration, delivering responsive and user-friendly websites.",
+    },
+    {
+      id: 3,
+      service: "Data Science",
+      icon: <FaDatabase />,
+      description:
+        "Advanced data science services to analyze and interpret complex data, providing actionable insights and data-driven solutions.",
+    },
+    {
+      id: 4,
+      service: "Cloud Computing",
+      icon: <FaCloud />,
+      description:
+        "Reliable cloud computing services to manage, store, and process data efficiently, offering scalable and flexible cloud solutions.",
+    },
+    {
+      id: 5,
+      service: "DevOps",
+      icon: <FaCogs />,
+      description:
+        "DevOps services to streamline software development and operations, enhancing deployment efficiency and reducing time to market.",
+    },
+    {
+      id: 6,
+      service: "Mobile App Development",
+      icon: <FaMobileAlt />,
+      description:
+        "Expert mobile app development for iOS and Android platforms, creating intuitive and engaging mobile experiences for your users.",
+    },
+  ];
+
+  return (
+    <section className="services">
+      <h3>Top Niches</h3>
+      <div className="grid">
+        {services.map((element) => {
+          return (
+            <div className="card" key={element.id}>
+              <span className="icon">{element.icon}</span>
+              <h4>{element.service}</h4>
+              <p>{element.description}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+export default TopNiches;
+</file>
+
+<file path="frontend/src/pages/Jobs.jsx">
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import { clearAllJobErrors, fetchJobs } from "../store/slices/jobSlice";
+import Spinner from "../components/Spinner";
+import { FaSearch, FaFilter, FaMapMarkerAlt, FaBriefcase, FaMoneyBillWave, FaCalendarAlt } from "react-icons/fa";
+import { Link } from "react-router-dom";
+
+const Jobs = () => {
+  const [city, setCity] = useState("All");
+  const [niche, setNiche] = useState("All");
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const { jobs, loading, error } = useSelector((state) => state.jobs);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearAllJobErrors());
+    }
+    dispatch(fetchJobs(city === "All" ? "" : city, niche === "All" ? "" : niche, searchKeyword));
+  }, [dispatch, error, city, niche, searchKeyword]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    dispatch(fetchJobs(city === "All" ? "" : city, niche === "All" ? "" : niche, searchKeyword));
+  };
+
+  const cities = [
+    "All",
+    "Colombo",
+    "Kandy",
+    "Galle",
+    "Jaffna",
+    "Negombo",
+    "Anuradhapura",
+    "Ratnapura",
+    "Trincomalee",
+    "Batticaloa",
+    "Matara",
+    "Kurunegala",
+    "Badulla",
+    "Puttalam",
+    "Nuwara Eliya",
+    "Polonnaruwa",
+    "Ampara",
+    "Hambantota",
+    "Kalutara",
+    "Mannar",
+    "Kilinochchi",
+  ];
+
+  const nichesArray = [
+    "All",
+    "Software Development",
+    "Web Development",
+    "Cybersecurity",
+    "Data Science",
+    "Artificial Intelligence",
+    "Cloud Computing",
+    "DevOps",
+    "Mobile App Development",
+    "Blockchain",
+    "Database Administration",
+    "Network Administration",
+    "UI/UX Design",
+    "Game Development",
+    "IoT (Internet of Things)",
+    "Big Data",
+    "Machine Learning",
+    "IT Project Management",
+    "IT Support and Helpdesk",
+    "Systems Administration",
+    "IT Consulting",
+  ];
+
+  const clearFilters = () => {
+    setCity("All");
+    setNiche("All");
+    setSearchKeyword("");
+    dispatch(fetchJobs("", "", ""));
+  };
+
+  return (
+    <>
+      {loading ? (
+        <Spinner />
+      ) : (
+        <section className="jobs-page">
+          <div className="container">
+            <div className="page-header">
+              <h1>Find Your Dream Job</h1>
+              <p>Discover opportunities that match your skills and aspirations</p>
+            </div>
+
+            {/* Search Bar */}
+            <form className="search-bar" onSubmit={handleSearch}>
+              <div className="search-input-group">
+                <div className="input-with-icon">
+                  <FaSearch className="input-icon" />
+                  <input
+                    type="text"
+                    placeholder="Job title, keywords, or company"
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="search-btn">
+                  <FaSearch />
+                  Search Jobs
+                </button>
+              </div>
+            </form>
+
+            {/* Filter Toggle for Mobile */}
+            <div className="filter-toggle">
+              <button 
+                className="filter-btn"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <FaFilter />
+                Filters
+                {((city && city !== "All") || (niche && niche !== "All")) && (
+                  <span className="filter-badge"></span>
+                )}
+              </button>
+            </div>
+
+            <div className="jobs-layout">
+              {/* Sidebar Filters */}
+              <div className={`filter-sidebar ${showFilters ? 'show' : ''}`}>
+                <div className="sidebar-header">
+                  <h3>Filters</h3>
+                  <button 
+                    className="clear-filters"
+                    onClick={clearFilters}
+                  >
+                    Clear All
+                  </button>
+                </div>
+
+                <div className="filter-group">
+                  <h4>
+                    <FaMapMarkerAlt />
+                    Location
+                  </h4>
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="filter-select"
+                  >
+                    {cities.map((cityOption, index) => (
+                      <option value={cityOption} key={index}>
+                        {cityOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <h4>
+                    <FaBriefcase />
+                    Job Niche
+                  </h4>
+                  <select
+                    value={niche}
+                    onChange={(e) => setNiche(e.target.value)}
+                    className="filter-select"
+                  >
+                    {nichesArray.map((nicheOption, index) => (
+                      <option value={nicheOption} key={index}>
+                        {nicheOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="active-filters">
+                  {(city && city !== "All") && (
+                    <span className="active-filter">
+                      {city}
+                      <button onClick={() => setCity("All")}>×</button>
+                    </span>
+                  )}
+                  {(niche && niche !== "All") && (
+                    <span className="active-filter">
+                      {niche}
+                      <button onClick={() => setNiche("All")}>×</button>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Jobs List */}
+              <div className="jobs-content">
+                <div className="results-header">
+                  <h2>
+                    {jobs && jobs.length > 0 
+                      ? `${jobs.length} Job${jobs.length !== 1 ? 's' : ''} Found`
+                      : 'No Jobs Found'
+                    }
+                  </h2>
+                  <div className="sort-options">
+                    <span>Sort by: </span>
+                    <select>
+                      <option value="newest">Newest First</option>
+                      <option value="salary">Salary: High to Low</option>
+                      <option value="relevance">Relevance</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="jobs-container">
+                  {jobs && jobs.length > 0 ? (
+                    jobs.map((job) => (
+                      <div className="job-card" key={job._id}>
+                        <div className="job-header">
+                          <div className="company-info">
+                            <div className="company-avatar">
+                              {job.companyName ? job.companyName.charAt(0).toUpperCase() : 'C'}
+                            </div>
+                            <div className="job-title-section">
+                              <h3 className="job-title">{job.title}</h3>
+                              <p className="company-name">{job.companyName}</p>
+                            </div>
+                          </div>
+                          {job.hiringMultipleCandidates === "Yes" ? (
+                            <span className="badge badge-primary">
+                              Multiple Openings
+                            </span>
+                          ) : (
+                            <span className="badge badge-secondary">
+                              Hiring
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="job-details">
+                          <div className="detail-item">
+                            <FaMapMarkerAlt />
+                            <span>{job.location}</span>
+                          </div>
+                          <div className="detail-item">
+                            <FaBriefcase />
+                            <span>{job.jobType}</span>
+                          </div>
+                          <div className="detail-item">
+                            <FaMoneyBillWave />
+                            <span>Rs. {job.salary}</span>
+                          </div>
+                          <div className="detail-item">
+                            <FaCalendarAlt />
+                            <span>Posted: {new Date(job.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        <div className="job-niche">
+                          <span className="niche-tag">{job.jobNiche}</span>
+                        </div>
+
+                        <div className="job-description">
+                          <p>{job.introduction?.substring(0, 150)}...</p>
+                        </div>
+
+                        <div className="job-actions">
+                          <Link
+                            to={`/post/application/${job._id}`}
+                            className="btn btn-primary"
+                          >
+                            Apply Now
+                          </Link>
+                          <button className="btn btn-outline">
+                            Save Job
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-jobs-found">
+                      <div className="no-jobs-content">
+                        <img 
+                          src="/jobscape.png" 
+                          alt="No jobs found" 
+                          className="no-jobs-image"
+                        />
+                        <h3>No jobs match your criteria</h3>
+                        <p>Try adjusting your filters or search terms to find more opportunities.</p>
+                        <button 
+                          className="btn btn-primary"
+                          onClick={clearFilters}
+                        >
+                          Clear All Filters
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+    </>
+  );
+};
+
+export default Jobs;
+</file>
+
+<file path="jest.setup.js">
+import '@testing-library/jest-dom';
+
+process.env.JWT_SECRET_KEY = 'testsecret';
+process.env.JWT_EXPIRE = '1d';
+process.env.COOKIE_EXPIRE = '5';
+process.env.SMTP_HOST = 'smtp.test';
+process.env.SMTP_SERVICE = 'gmail';
+process.env.SMTP_PORT = '465';
+process.env.SMTP_MAIL = 'test@test.com';
+process.env.SMTP_PASSWORD = 'password';
+process.env.ML_SERVICE_URL = 'http://localhost:8001';
+</file>
+
+<file path="frontend/src/store/slices/applicationSlice.js">
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const applicationSlice = createSlice({
+  name: "applications",
+  initialState: {
+    applications: [],
+    loading: false,
+    error: null,
+    message: null,
+  },
+  reducers: {
+    requestForAllApplications(state, action) {
+      state.loading = true;
+      state.error = null;
+    },
+    successForAllApplications(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.applications = action.payload;
+    },
+    failureForAllApplications(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+    },
+    requestForMyApplications(state, action) {
+      state.loading = true;
+      state.error = null;
+    },
+    successForMyApplications(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.applications = action.payload;
+    },
+    failureForMyApplications(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+    },
+    requestForPostApplication(state, action) {
+      state.loading = true;
+      state.error = null;
+      state.message = null;
+    },
+    successForPostApplication(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.message = action.payload;
+    },
+    failureForPostApplication(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+      state.message = null;
+    },
+    requestForDeleteApplication(state, action) {
+      state.loading = true;
+      state.error = null;
+      state.message = null;
+    },
+    successForDeleteApplication(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.message = action.payload;
+    },
+    failureForDeleteApplication(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+      state.message = null;
+    },
+
+    clearAllErrors(state, action) {
+      state.error = null;
+      state.applications = state.applications;
+    },
+    resetApplicationSlice(state, action) {
+      state.error = null;
+      state.applications = state.applications;
+      state.message = null;
+      state.loading = false;
+    },
+  },
+});
+
+export const fetchEmployerApplications = () => async (dispatch) => {
+  dispatch(applicationSlice.actions.requestForAllApplications());
+  try {
+    const response = await axios.get(
+      `http://localhost:4000/api/v1/application/employer/getall`,
+      {
+        withCredentials: true,
+      }
+    );
+    dispatch(
+      applicationSlice.actions.successForAllApplications(
+        response.data.applications
+      )
+    );
+    dispatch(applicationSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(
+      applicationSlice.actions.failureForAllApplications(
+        error.response.data.message
+      )
+    );
+  }
+};
+
+export const fetchJobSeekerApplications = () => async (dispatch) => {
+  dispatch(applicationSlice.actions.requestForMyApplications());
+  try {
+    const response = await axios.get(
+      `http://localhost:4000/api/v1/application/jobseeker/getall`,
+      {
+        withCredentials: true,
+      }
+    );
+    dispatch(
+      applicationSlice.actions.successForMyApplications(
+        response.data.applications
+      )
+    );
+    dispatch(applicationSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(
+      applicationSlice.actions.failureForMyApplications(
+        error.response.data.message
+      )
+    );
+  }
+};
+
+export const postApplication = (data, jobId) => async (dispatch) => {
+  dispatch(applicationSlice.actions.requestForPostApplication());
+  try {
+    const response = await axios.post(
+      `http://localhost:4000/api/v1/application/post/${jobId}`,
+      data,
+      {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    dispatch(
+      applicationSlice.actions.successForPostApplication(response.data.message)
+    );
+    dispatch(applicationSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(
+      applicationSlice.actions.failureForPostApplication(
+        error.response.data.message
+      )
+    );
+  }
+};
+
+export const deleteApplication = (id) => async (dispatch) => {
+  dispatch(applicationSlice.actions.requestForDeleteApplication());
+  try {
+    const response = await axios.delete(
+      `http://localhost:4000/api/v1/application/delete/${id}`,
+      { withCredentials: true }
+    );
+    dispatch(
+      applicationSlice.actions.successForDeleteApplication(
+        response.data.message
+      )
+    );
+    dispatch(clearAllApplicationErrors());
+  } catch (error) {
+    dispatch(
+      applicationSlice.actions.failureForDeleteApplication(
+        error.response.data.message
+      )
+    );
+  }
+};
+
+export const clearAllApplicationErrors = () => (dispatch) => {
+  dispatch(applicationSlice.actions.clearAllErrors());
+};
+
+export const resetApplicationSlice = () => (dispatch) => {
+  dispatch(applicationSlice.actions.resetApplicationSlice());
+};
+
+export default applicationSlice.reducer;
+</file>
+
+<file path="frontend/src/store/slices/jobSlice.js">
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const jobSlice = createSlice({
+  name: "jobs",
+  initialState: {
+    jobs: [],
+    loading: false,
+    error: null,
+    message: null,
+    singleJob: {},
+    myJobs: [],
+  },
+  reducers: {
+    requestForAllJobs(state, action) {
+      state.loading = true;
+      state.error = null;
+    },
+    successForAllJobs(state, action) {
+      state.loading = false;
+      state.jobs = action.payload;
+      state.error = null;
+    },
+    failureForAllJobs(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+    },
+    requestForSingleJob(state, action) {
+      state.message = null;
+      state.error = null;
+      state.loading = true;
+    },
+    successForSingleJob(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.singleJob = action.payload;
+    },
+    failureForSingleJob(state, action) {
+      state.singleJob = state.singleJob;
+      state.error = action.payload;
+      state.loading = false;
+    },
+    requestForPostJob(state, action) {
+      state.message = null;
+      state.error = null;
+      state.loading = true;
+    },
+    successForPostJob(state, action) {
+      state.message = action.payload;
+      state.error = null;
+      state.loading = false;
+    },
+    failureForPostJob(state, action) {
+      state.message = null;
+      state.error = action.payload;
+      state.loading = false;
+    },
+
+    requestForDeleteJob(state, action) {
+      state.loading = true;
+      state.error = null;
+      state.message = null;
+    },
+    successForDeleteJob(state, action) {
+      state.loading = false;
+      state.error = null;
+      state.message = action.payload;
+    },
+    failureForDeleteJob(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+      state.message = null;
+    },
+
+    requestForMyJobs(state, action) {
+      state.loading = true;
+      state.myJobs = [];
+      state.error = null;
+    },
+    successForMyJobs(state, action) {
+      state.loading = false;
+      state.myJobs = action.payload;
+      state.error = null;
+    },
+    failureForMyJobs(state, action) {
+      state.loading = false;
+      state.myJobs = state.myJobs;
+      state.error = action.payload;
+    },
+
+    clearAllErrors(state, action) {
+      state.error = null;
+      state.jobs = state.jobs;
+    },
+    resetJobSlice(state, action) {
+      state.error = null;
+      state.jobs = state.jobs;
+      state.loading = false;
+      state.message = null;
+      state.myJobs = state.myJobs;
+      state.singleJob = {};
+    },
+  },
+});
+
+export const fetchJobs =
+  (city, niche, searchKeyword = "") =>
+  async (dispatch) => {
+    try {
+      dispatch(jobSlice.actions.requestForAllJobs());
+      let link = "http://localhost:4000/api/v1/job/getall?";
+      let queryParams = [];
+      if (searchKeyword) {
+        queryParams.push(`searchKeyword=${searchKeyword}`);
+      }
+      if (city && city !== "All") {
+        queryParams.push(`city=${city}`);
+      }
+
+      /***************************************************/
+      /* BUG No.3 */
+      if (city && city === "All") {
+        queryParams = [];
+        if (searchKeyword) {
+          queryParams.push(`searchKeyword=${searchKeyword}`);
+        }
+      }
+      /***************************************************/
+
+      if (niche) {
+        queryParams.push(`niche=${niche}`);
+      }
+
+      /***************************************************/
+      /* BUG No.4 */
+      if (niche && niche === "All") {
+        queryParams = [];
+        if (searchKeyword) {
+          queryParams.push(`searchKeyword=${searchKeyword}`);
+        }
+        if (city && city !== "All") {
+          queryParams.push(`city=${city}`);
+        }
+      }
+      /***************************************************/
+
+      link += queryParams.join("&");
+      const response = await axios.get(link, { withCredentials: true });
+      dispatch(jobSlice.actions.successForAllJobs(response.data.jobs));
+      dispatch(jobSlice.actions.clearAllErrors());
+    } catch (error) {
+      dispatch(jobSlice.actions.failureForAllJobs(error.response?.data?.message || error.message));
+    }
+  };
+
+export const fetchSingleJob = (jobId) => async (dispatch) => {
+  dispatch(jobSlice.actions.requestForSingleJob());
+  try {
+    const response = await axios.get(
+      `http://localhost:4000/api/v1/job/get/${jobId}`,
+      { withCredentials: true }
+    );
+    dispatch(jobSlice.actions.successForSingleJob(response.data.job));
+    dispatch(jobSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(jobSlice.actions.failureForSingleJob(error.response?.data?.message || error.message));
+  }
+};
+
+export const postJob = (data) => async (dispatch) => {
+  dispatch(jobSlice.actions.requestForPostJob());
+  try {
+    const response = await axios.post(
+      `http://localhost:4000/api/v1/job/post`,
+      data,
+      { withCredentials: true, headers: { "Content-Type": "application/json" } }
+    );
+    dispatch(jobSlice.actions.successForPostJob(response.data.message));
+    dispatch(jobSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(jobSlice.actions.failureForPostJob(error.response?.data?.message || error.message));
+  }
+};
+
+export const getMyJobs = () => async (dispatch) => {
+  dispatch(jobSlice.actions.requestForMyJobs());
+  try {
+    const response = await axios.get(
+      `http://localhost:4000/api/v1/job/getmyjobs`,
+      { withCredentials: true }
+    );
+    dispatch(jobSlice.actions.successForMyJobs(response.data.myJobs));
+    dispatch(jobSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(jobSlice.actions.failureForMyJobs(error.response?.data?.message || error.message));
+  }
+};
+
+export const deleteJob = (id) => async (dispatch) => {
+  dispatch(jobSlice.actions.requestForDeleteJob());
+  try {
+    const response = await axios.delete(
+      `http://localhost:4000/api/v1/job/delete/${id}`,
+      { withCredentials: true }
+    );
+    dispatch(jobSlice.actions.successForDeleteJob(response.data.message));
+    dispatch(clearAllJobErrors());
+  } catch (error) {
+    dispatch(jobSlice.actions.failureForDeleteJob(error.response?.data?.message || error.message));
+  }
+};
+
+export const clearAllJobErrors = () => (dispatch) => {
+  dispatch(jobSlice.actions.clearAllErrors());
+};
+
+export const resetJobSlice = () => (dispatch) => {
+  dispatch(jobSlice.actions.resetJobSlice());
+};
+
+export default jobSlice.reducer;
+</file>
+
+<file path="frontend/src/store/slices/recommendationSlice.js">
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const recommendationSlice = createSlice({
+  name: "recommendation",
+  initialState: {
+    recommendations: [],
+    skills: [],
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    request(state) {
+      state.loading = true;
+      state.error = null;
+    },
+    recommendSuccess(state, action) {
+      state.loading = false;
+      state.recommendations = action.payload;
+    },
+    skillsSuccess(state, action) {
+      state.loading = false;
+      state.skills = action.payload;
+    },
+    failure(state, action) {
+      state.loading = false;
+      state.error = action.payload;
+    },
+    clearErrors(state) {
+      state.error = null;
+    },
+  },
+});
+
+export const fetchRecommendations = (resume) => async (dispatch) => {
+  try {
+    dispatch(recommendationSlice.actions.request());
+    const { data } = await axios.post(
+      `http://localhost:4000/api/v1/recommend`,
+      { resume },
+      { withCredentials: true }
+    );
+    dispatch(recommendationSlice.actions.recommendSuccess(data.recommendations));
+  } catch (error) {
+    dispatch(
+      recommendationSlice.actions.failure(
+        error.response?.data?.message || error.message
+      )
+    );
+  }
+};
+
+export const fetchSkillSuggestions = (resume, category) => async (dispatch) => {
+  try {
+    dispatch(recommendationSlice.actions.request());
+    const { data } = await axios.post(
+      `http://localhost:4000/api/v1/suggestSkills`,
+      { resume, category },
+      { withCredentials: true }
+    );
+    dispatch(recommendationSlice.actions.skillsSuccess(data.missingSkills));
+  } catch (error) {
+    dispatch(
+      recommendationSlice.actions.failure(
+        error.response?.data?.message || error.message
+      )
+    );
+  }
+};
+
+export const clearRecommendationErrors = () => (dispatch) => {
+  dispatch(recommendationSlice.actions.clearErrors());
+};
+
+export default recommendationSlice.reducer;
+</file>
+
+<file path="frontend/src/store/slices/updateProfileSlice.js">
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const updateProfileSlice = createSlice({
+  name: "updateProfile",
+  initialState: {
+    loading: false,
+    error: null,
+    isUpdated: false,
+  },
+  reducers: {
+    updateProfileRequest(state, action) {
+      state.loading = true;
+    },
+    updateProfileSuccess(state, action) {
+      state.error = null;
+      state.loading = false;
+      state.isUpdated = true;
+    },
+    updateProfileFailed(state, action) {
+      state.error = action.payload;
+      state.loading = false;
+      state.isUpdated = false;
+    },
+    updatePasswordRequest(state, action) {
+      state.loading = true;
+    },
+    updatePasswordSuccess(state, action) {
+      state.error = null;
+      state.loading = false;
+      state.isUpdated = true;
+    },
+    updatePasswordFailed(state, action) {
+      state.error = action.payload;
+      state.loading = false;
+      state.isUpdated = false;
+    },
+    profileResetAfterUpdate(state, action) {
+      state.error = null;
+      state.isUpdated = false;
+      state.loading = false;
+    },
+  },
+});
+
+export const updateProfile = (data) => async (dispatch) => {
+  dispatch(updateProfileSlice.actions.updateProfileRequest());
+  try {
+    const response = await axios.put(
+      "http://localhost:4000/api/v1/user/update/profile",
+      data,
+      {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    dispatch(updateProfileSlice.actions.updateProfileSuccess());
+  } catch (error) {
+    dispatch(
+      updateProfileSlice.actions.updateProfileFailed(
+        error.response.data.message || "Failed to update profile."
+      )
+    );
+  }
+};
+export const updatePassword = (data) => async (dispatch) => {
+  dispatch(updateProfileSlice.actions.updatePasswordRequest());
+  try {
+    const response = await axios.put(
+      "http://localhost:4000/api/v1/user/update/password",
+      data,
+      {
+        withCredentials: true,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    dispatch(updateProfileSlice.actions.updatePasswordSuccess());
+  } catch (error) {
+    dispatch(
+      updateProfileSlice.actions.updatePasswordFailed(
+        error.response.data.message || "Failed to update password."
+      )
+    );
+  }
+};
+
+export const clearAllUpdateProfileErrors = () => (dispatch) => {
+  dispatch(updateProfileSlice.actions.profileResetAfterUpdate());
+};
+
+export default updateProfileSlice.reducer;
+</file>
+
+<file path="frontend/src/store/slices/userSlice.js">
+import { createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const userSlice = createSlice({
+  name: "user",
+  initialState: {
+    loading: false,
+    isAuthenticated: false,
+    user: {},
+    error: null,
+    message: null,
+  },
+  reducers: {
+    registerRequest(state) {
+      state.loading = true;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = null;
+      state.message = null;
+    },
+    registerSuccess(state, action) {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.user = action.payload.user;
+      state.error = null;
+      state.message = action.payload.message;
+    },
+    registerFailed(state, action) {
+      state.loading = false;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = action.payload;
+      state.message = null;
+    },
+    loginRequest(state) {
+      state.loading = true;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = null;
+      state.message = null;
+    },
+    loginSuccess(state, action) {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.user = action.payload.user;
+      state.error = null;
+      state.message = action.payload.message;
+    },
+    loginFailed(state, action) {
+      state.loading = false;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = action.payload;
+      state.message = null;
+    },
+    fetchUserRequest(state) {
+      state.loading = true;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = null;
+    },
+    fetchUserSuccess(state, action) {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.user = action.payload;
+      state.error = null;
+    },
+    fetchUserFailed(state, action) {
+      state.loading = false;
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = action.payload;
+    },
+    logoutSuccess(state) {
+      state.isAuthenticated = false;
+      state.user = {};
+      state.error = null;
+    },
+    logoutFailed(state, action) {
+      state.error = action.payload;
+    },
+    clearAllErrors(state) {
+      state.error = null;
+    },
+  },
+});
+
+export const register = (data) => async (dispatch) => {
+  dispatch(userSlice.actions.registerRequest());
+  try {
+    const response = await axios.post(
+      "http://localhost:4000/api/v1/user/register",
+      data,
+      {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    dispatch(userSlice.actions.registerSuccess(response.data));
+    dispatch(userSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(userSlice.actions.registerFailed(error.response?.data?.message || error.message));
+  }
+};
+
+export const login = (data) => async (dispatch) => {
+  dispatch(userSlice.actions.loginRequest());
+  try {
+    const response = await axios.post(
+      "http://localhost:4000/api/v1/user/login",
+      data,
+      {
+        withCredentials: true,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    dispatch(userSlice.actions.loginSuccess(response.data));
+    dispatch(userSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(userSlice.actions.loginFailed(error.response?.data?.message || error.message));
+  }
+};
+
+export const getUser = () => async (dispatch) => {
+  dispatch(userSlice.actions.fetchUserRequest());
+  try {
+    const response = await axios.get(
+      "http://localhost:4000/api/v1/user/getuser",
+      {
+        withCredentials: true,
+      }
+    );
+    dispatch(userSlice.actions.fetchUserSuccess(response.data.user));
+    dispatch(userSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(userSlice.actions.fetchUserFailed(error.response?.data?.message || error.message));
+  }
+};
+export const logout = () => async (dispatch) => {
+  try {
+    await axios.get(
+      "http://localhost:4000/api/v1/user/logout",
+      {
+        withCredentials: true,
+      }
+    );
+    dispatch(userSlice.actions.logoutSuccess());
+    dispatch(userSlice.actions.clearAllErrors());
+  } catch (error) {
+    dispatch(userSlice.actions.logoutFailed(error.response?.data?.message || error.message));
+  }
+};
+
+export const clearAllUserErrors = () => (dispatch) => {
+  dispatch(userSlice.actions.clearAllErrors());
+};
+
+export default userSlice.reducer;
+</file>
+
+<file path="frontend/src/components/Hero.jsx">
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Button from "./ui/Button";
+
+const Hero = () => {
+  const navigate = useNavigate();
+  const [keyword, setKeyword] = useState("");
+  const [city, setCity] = useState("");
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    navigate("/jobs");
+  };
+
+  return (
+    <section className="hero">
+      <div className="content">
+        <h1>Find Your Dream Job Today</h1>
+        <h4>
+          Connecting Talent with Opportunities Across the Nation for Every Skill
+          Level
+        </h4>
+        <form className="search-bar" onSubmit={handleSearch}>
+          <input
+            type="text"
+            placeholder="Job Title, Skills, or Company"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder="City or Location"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          <Button type="submit">Search</Button>
+        </form>
+        <div className="cta">
+          <Button to="/jobs">Browse Jobs</Button>
+          <Button to="/dashboard">Post a Job</Button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Hero;
+</file>
+
+<file path="frontend/src/components/Navbar.jsx">
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+
+const Navbar = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const toggleMenu = () => setMenuOpen(!menuOpen);
+
+  return (
+    <nav className="navbar">
+      <div className="logo">
+        <Link to="/">JobScape</Link>
+      </div>
+      <ul className={`nav-links ${menuOpen ? 'active' : ''}`}>
+        <li><Link to="/">Home</Link></li>
+        <li><Link to="/jobs">Jobs</Link></li>
+        <li><Link to="/register">Register</Link></li>
+        <li><Link to="/login">Login</Link></li>
+      </ul>
+      <div className="hamburger" onClick={toggleMenu}>
+        <div className="line"></div>
+        <div className="line"></div>
+        <div className="line"></div>
+      </div>
+    </nav>
+  );
+};
+
+export default Navbar;
+</file>
+
+<file path="frontend/src/pages/Home.jsx">
+import React from "react";
+import Hero from "../components/Hero";
+import TopNiches from "../components/TopNiches";
+import HowItWorks from "../components/HowItWorks";
+
+const Home = () => {
+  return (
+    <>
+      <Hero />
+      <TopNiches />
+      <HowItWorks />
+    </>
+  );
+};
+
+export default Home;
+</file>
+
+<file path="frontend/src/App.css">
+/* GLOBAL STYLES */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: #f4f7fa;
+  color: #333;
+  line-height: 1.6;
+  transition: all 0.3s ease-in-out;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  color: #333;
+  font-weight: 700;
+}
+
+p {
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+/* LIGHT/DARK MODE */
+body.dark-mode {
+  background-color: #222;
+  color: #eee;
+}
+
+body.dark-mode .navbar {
+  background-color: #1c1c1c;
+}
+
+body.dark-mode .card {
+  background-color: #333;
+  color: white;
+}
+
+body.dark-mode .btn {
+  background-color: #ff8c00;
+}
+
+body.dark-mode .btn:hover {
+  background-color: #ff6f00;
+}
+
+/* NEUMORPHISM (Soft UI) */
+.neumorphism {
+  background: #e0e5ec;
+  border-radius: 15px;
+  box-shadow: 10px 10px 15px rgba(0, 0, 0, 0.15), -10px -10px 15px rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.neumorphism:hover {
+  box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.2), -10px -10px 30px rgba(255, 255, 255, 0.5);
+}
+
+.neumorphism input,
+.neumorphism button {
+  background: #e0e5ec;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.1), -8px -8px 20px rgba(255, 255, 255, 0.7);
+  padding: 15px 20px;
+}
+
+.neumorphism input:focus,
+.neumorphism button:focus {
+  box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.2), -8px -8px 20px rgba(255, 255, 255, 0.9);
+  outline: none;
+}
+
+/* GLASSMORPHISM */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  backdrop-filter: blur(15px);
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass:hover {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* NAVBAR STYLES */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background-color: #222;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  transition: background-color 0.3s ease;
+}
+
+.navbar .logo a {
+  color: white;
+  font-size: 26px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 25px;
+}
+
+.nav-links a {
+  color: white;
+  font-size: 18px;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-links a:hover {
+  background-color: #ff8c00;
+  color: white;
+}
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.hamburger .line {
+  width: 30px;
+  height: 3px;
+  background-color: white;
+  border-radius: 5px;
+}
+
+.nav-links.active {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+}
+
+/* BUTTONS */
+button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 14px 30px;
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+}
+
+button:disabled {
+  background-color: #ddd;
+  cursor: not-allowed;
+}
+
+.btn {
+  background-color: #ff8c00;
+  color: white;
+  padding: 14px 30px;
+  border-radius: 30px;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease, transform 0.2s ease;
+}
+
+.btn:hover {
+  background-color: #ff6f00;
+  transform: translateY(-2px);
+}
+
+.outline_btn {
+  background-color: transparent;
+  color: #ff8c00;
+  border: 2px solid #ff8c00;
+}
+
+.outline_btn:hover {
+  background-color: #ff8c00;
+  color: white;
+}
+
+/* INPUT FIELDS */
+input[type="text"], input[type="email"], input[type="number"], textarea {
+  background: #fff;
+  padding: 15px;
+  border-radius: 15px;
+  border: 1px solid #ddd;
+  font-size: 16px;
+  width: 100%;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input:focus, textarea:focus {
+  border-color: #4CAF50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  outline: none;
+}
+
+/* CARDS */
+.card {
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.sub-sec {
+  font-size: 14px;
+  color: #555;
+}
+
+/* LOADING SPINNER */
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* TOAST NOTIFICATIONS */
+.Toastify__toast {
+  border-radius: 12px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.Toastify__toast--success {
+  background-color: #4CAF50;
+}
+
+.Toastify__toast--error {
+  background-color: #f44336;
+}
+
+/* MICRO INTERACTIONS */
+a, button {
+  transition: transform 0.2s ease-in-out;
+}
+
+a:hover, button:hover {
+  transform: scale(1.05);
+}
+
+input[type="text"]:focus, input[type="email"]:focus, textarea:focus {
+  border: 2px solid #4CAF50;
+}
+
+/* CUSTOM SCROLLBAR */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #4CAF50;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+/* GLASSMORPHISM SECTIONS */
+.section-glass {
+  padding: 80px 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  color: white;
+  text-align: center;
+  border-radius: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.section-glass h2 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.section-glass p {
+  font-size: 1.1rem;
+}
+</file>
+
+</files>

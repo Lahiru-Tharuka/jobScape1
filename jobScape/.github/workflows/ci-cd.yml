@@ -1,0 +1,107 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build backend
+        working-directory: backend
+        run: npm run build --if-present
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build --if-present
+      - name: Push build metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='build'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/build
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test --if-present
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test --if-present
+      - name: Push test metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='test'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/test
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging
+        run: ./scripts/deploy.sh staging
+      - name: Push staging metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='deploy_staging'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/deploy_staging
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production (blue-green)
+        run: ./scripts/deploy.sh production blue-green
+      - name: Push production metrics
+        if: env.PUSHGATEWAY_URL != ''
+        run: |
+          echo "ci_cd_job_status{job='deploy_production'} 1" | curl --data-binary @- $PUSHGATEWAY_URL/metrics/job/deploy_production
+  release:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create tag
+        run: |
+          VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Generate changelog
+        run: ./scripts/generate-changelog.sh "$VERSION"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          body_path: CHANGELOG.md
