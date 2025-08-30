@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
@@ -17,6 +17,15 @@ import { getUser } from "./store/slices/userSlice";
 
 const App = () => {
   const dispatch = useDispatch();
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+
+  useEffect(() => {
+    document.body.className = theme === "light" ? "light" : "";
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () =>
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   useEffect(() => {
     dispatch(getUser());
@@ -25,7 +34,7 @@ const App = () => {
   return (
     <>
       <Router>
-        <Navbar />
+        <Navbar theme={theme} toggleTheme={toggleTheme} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/jobs" element={<Jobs />} />
@@ -39,7 +48,7 @@ const App = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
-        <ToastContainer position="top-right" theme="dark" />
+        <ToastContainer position="top-right" theme={theme} />
       </Router>
     </>
   );

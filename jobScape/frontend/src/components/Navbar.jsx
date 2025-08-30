@@ -5,19 +5,11 @@ import { GiHamburgerMenu } from "react-icons/gi";
 import { FaSun, FaMoon, FaUserCircle } from "react-icons/fa";
 import { RiLogoutCircleRLine } from "react-icons/ri";
 
-const Navbar = () => {
+const Navbar = ({ theme, toggleTheme }) => {
   const [show, setShow] = useState(false);
-  const [theme, setTheme] = useState(
-    localStorage.getItem("theme") || "dark"
-  );
   const [scrolled, setScrolled] = useState(false);
   const { isAuthenticated, user } = useSelector((state) => state.user);
   const location = useLocation();
-
-  useEffect(() => {
-    document.body.className = theme === "light" ? "light" : "";
-    localStorage.setItem("theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,9 +20,6 @@ const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const toggleTheme = () =>
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   const isActiveLink = (path) => {
     return location.pathname === path;
